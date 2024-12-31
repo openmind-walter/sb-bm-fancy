@@ -21,11 +21,7 @@ export class FancyUpdateService implements OnModuleInit {
         this.processsToFancyEvents();
     }
 
-    // async subscribeToFancyEventStream() {   
-    //     return await this.cacheService.getStream(configuration.dragonflyClient, configuration.bookMakerSubKey,(data)=>{
-    //         console.log(data);
-    //     });
-    // }
+
 
     async processsToFancyEvents() {
         try {
@@ -33,7 +29,7 @@ export class FancyUpdateService implements OnModuleInit {
                 const task = await this.cacheService.brpop(configuration.sbtasksfancy, 0);
                 if (task) {
                     const parsedTask = JSON.parse(task[1]);
-                    this.logger.info(`Worker ${process.pid} processing task with: ${parsedTask.id}`, FancyUpdateService.name);
+                    // this.logger.info(`Worker ${process.pid} processing task with: ${parsedTask.id}`, FancyUpdateService.name);
                     const fancyMarket = parsedTask.data as FancyUpdate[];
                     this.fancyMarketUpdates$.next(fancyMarket);
 
@@ -46,41 +42,51 @@ export class FancyUpdateService implements OnModuleInit {
 
     private async processFancyMarketUpdates(fancyMarket: FancyUpdate[]) {
         try {
-            const batchSize = 100; // Define the size of each batch
-            const batches = [];
-
-            // Split the fancyMarket updates into smaller batches
+            const batchSize = 100;
             for (let i = 0; i < fancyMarket.length; i += batchSize) {
-                batches.push(fancyMarket.slice(i, i + batchSize));
-            }
-            // Process each batch
-            for (const batch of batches) {
+                const batch = fancyMarket.slice(i, i + batchSize);
                 await Promise.all(
                     batch.map(async (event) => {
-                        try {
-                            if (event.markets?.length) {
-                                await Promise.all(
-                                    event.markets.map(async (market) => {
+                        if (event.markets?.length) {
+                            await Promise.all(
+                                event.markets.map(async (market) => {
+                                    try {
+                                        const marketKey = `sb_${market.marketId}_1`;
+                                        const marketValue = JSON.stringify(market);
+                                        const timestamp = Date.now().toString();
+                                        await this.cacheService.hset(
+                                            configuration.redisPubClientFE,
+                                            marketKey,
+                                            'value',
+                                            marketValue
+                                        );
+                                        await this.cacheService.hset(
+                                            configuration.redisPubClientFE,
+                                            marketKey,
+                                            'timestamp',
+                                            timestamp
+                                        );
                                         await this.cacheService.publish(
                                             configuration.redisPubClientFE,
-                                            `${market.id}__fancy0`,
-                                            JSON.stringify(market)
+                                            `${market.marketId}__fancy0`,
+                                            marketValue
                                         );
-                                    })
-                                );
-                            }
-                        } catch (error) {
-                            this.logger.error(`Error publish fancy event to Redis: ${error.message}`, FancyUpdateService.name);
+                                    } catch (error) {
+                                        this.logger.error(`Error publishing fancy event to Redis: ${error.message}`, FancyUpdateService.name);
+                                    }
+                                })
+                            );
                         }
                     })
                 );
             }
         } catch (error) {
-            this.logger.error(`processFancyMarketUpdate: ${error.message}`, FancyUpdateService.name);
+            this.logger.error(`processFancyMarketUpdates: ${error.message}`, FancyUpdateService.name);
         }
     }
-}
-
+    
+    
+    }
 
 
 

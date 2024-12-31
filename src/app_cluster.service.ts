@@ -1,4 +1,4 @@
-const cluster = require('cluster'); 
+const cluster = require('cluster');
 import * as os from 'os';
 import { Injectable } from '@nestjs/common';
 
@@ -7,8 +7,8 @@ const numCPUs = os.cpus().length;
 @Injectable()
 export class AppClusterService {
     static clusterize(callback: Function): void {
-        if(cluster.isMaster){
-            console.log(`Master server started on ${process.pid}`);
+        if (cluster.isMaster) {
+            // console.log(`Master server started on ${process.pid}`);
             for (let i = 0; i < numCPUs; i++) {
                 cluster.fork();
             }
@@ -17,8 +17,8 @@ export class AppClusterService {
                 cluster.fork();
             })
         } else {
-            console.log(`Cluster server started on ${process.pid}`)
-            console.log(`Worker ${process.pid} is processing the task`);
+            // console.log(`Cluster server started on ${process.pid}`)
+            // console.log(`Worker ${process.pid} is processing the task`);
             callback();
         }
     }

@@ -33,7 +33,7 @@ export class BookMakerUpdateService implements OnModuleInit {
                 if (task) {
                     const parsedTask = JSON.parse(task[1]);
 
-                    this.logger.info(`Worker ${process.pid} processing task with : ${parsedTask.id}`, BookMakerUpdateService.name);
+                    // this.logger.info(`Worker ${process.pid} processing task with : ${parsedTask.id}`, BookMakerUpdateService.name);
                     const BookMakerMarket = parsedTask.data as BookMakersUpdate[];
                     this.bookMakerMarketUpdates$.next(BookMakerMarket);
                 }
@@ -62,6 +62,20 @@ export class BookMakerUpdateService implements OnModuleInit {
                                 bookMakersUpdate.bookMakers.map(async (bookMaker: BookmakerData) => {
                                     const market_id = bookMaker.market_id;
                                     const bmStringified = JSON.stringify(bookMaker);
+                                    const timestamp = Date.now().toString();
+                                    const marketKey = `sb_${market_id}_1_${bookMaker.bookmaker_id}`;
+                                    await this.cacheService.hset(
+                                        configuration.redisPubClientFE,
+                                        marketKey,
+                                        'value',
+                                        bmStringified
+                                    );
+                                    await this.cacheService.hset(
+                                        configuration.redisPubClientFE,
+                                        marketKey,
+                                        'timestamp',
+                                        timestamp
+                                    );
                                     await this.cacheService.publish(
                                         configuration.redisPubClientFE,
                                         `${market_id}_${bookMaker.bookmaker_id}`,
