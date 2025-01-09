@@ -7,6 +7,7 @@ export enum MaraketStaus {
 }
 
 export class FancyMarketUpdateDto {
+    fancy_id: string
     auto_suspend_time: string;
     marketId: string;
     eventId: string;

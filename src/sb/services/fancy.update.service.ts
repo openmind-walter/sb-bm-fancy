@@ -4,6 +4,8 @@ import configuration from 'src/configuration';
 import { CacheService } from 'src/cache/cache.service';
 import { Subject } from 'rxjs';
 import { FancyUpdate } from 'src/model/fancyUpdate';
+import { WhiteLabelService } from './wl.service';
+import { CachedKeys } from 'src/common/cachedKeys';
 
 @Injectable()
 export class FancyUpdateService implements OnModuleInit {
@@ -12,6 +14,7 @@ export class FancyUpdateService implements OnModuleInit {
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
+        private whiteLabelService: WhiteLabelService
     ) {
         this.fancyMarketUpdates$
             .subscribe((updates) => this.processFancyMarketUpdates(updates));
@@ -42,6 +45,9 @@ export class FancyUpdateService implements OnModuleInit {
 
     private async processFancyMarketUpdates(fancyMarket: FancyUpdate[]) {
         try {
+
+            const wls = this.whiteLabelService.getActiveWhiteLabelsId();
+
             const batchSize = 100;
             for (let i = 0; i < fancyMarket.length; i += batchSize) {
                 const batch = fancyMarket.slice(i, i + batchSize);
@@ -50,29 +56,32 @@ export class FancyUpdateService implements OnModuleInit {
                         if (event.markets?.length) {
                             await Promise.all(
                                 event.markets.map(async (market) => {
-                                    try {
-                                        const marketKey = `sb_${market.marketId}_1`;
-                                        const marketValue = JSON.stringify(market);
-                                        const timestamp = Date.now().toString();
-                                        await this.cacheService.hset(
-                                            configuration.redisPubClientFE,
-                                            marketKey,
-                                            'value',
-                                            marketValue
-                                        );
-                                        await this.cacheService.hset(
-                                            configuration.redisPubClientFE,
-                                            marketKey,
-                                            'timestamp',
-                                            timestamp
-                                        );
-                                        await this.cacheService.publish(
-                                            configuration.redisPubClientFE,
-                                            `${market.marketId}__fancy0`,
-                                            marketValue
-                                        );
-                                    } catch (error) {
-                                        this.logger.error(`Error publishing fancy event to Redis: ${error.message}`, FancyUpdateService.name);
+                                    for (let i = 0; i < wls.length; i++) {
+                                        try {
+                                            const marketKey = CachedKeys.getFancy(market.marketId, wls[i], market.fancy_id);
+                                    
+                                            const marketValue = JSON.stringify(market);
+                                            const timestamp = Date.now().toString();
+                                            await this.cacheService.hset(
+                                                configuration.redisPubClientFE,
+                                                marketKey,
+                                                'value',
+                                                marketValue
+                                            );
+                                            await this.cacheService.hset(
+                                                configuration.redisPubClientFE,
+                                                marketKey,
+                                                'timestamp',
+                                                timestamp
+                                            );
+                                            await this.cacheService.publish(
+                                                configuration.redisPubClientFE,
+                                                marketKey,
+                                                marketValue
+                                            );
+                                        } catch (error) {
+                                            this.logger.error(`Error publishing fancy event to Redis: ${error.message}`, FancyUpdateService.name);
+                                        }
                                     }
                                 })
                             );
@@ -84,9 +93,9 @@ export class FancyUpdateService implements OnModuleInit {
             this.logger.error(`processFancyMarketUpdates: ${error.message}`, FancyUpdateService.name);
         }
     }
-    
-    
-    }
+
+
+}
 
 
 

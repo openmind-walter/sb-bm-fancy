@@ -5,6 +5,8 @@ import { Subject } from 'rxjs';
 import { BookMakersUpdate } from 'src/model/boomakerUpdate';
 import { CacheService } from 'src/cache/cache.service';
 import { BookmakerData } from 'src/model/bookmaker';
+import { WhiteLabelService } from './wl.service';
+import { CachedKeys } from 'src/common/cachedKeys';
 
 
 @Injectable()
@@ -14,6 +16,7 @@ export class BookMakerUpdateService implements OnModuleInit {
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
+        private whiteLabelService: WhiteLabelService
     ) {
         this.bookMakerMarketUpdates$
             .subscribe((updates) => this.processBookMakerMarketUpdates(updates));
@@ -45,6 +48,8 @@ export class BookMakerUpdateService implements OnModuleInit {
 
     private async processBookMakerMarketUpdates(eventbookmakers: BookMakersUpdate[]) {
         try {
+
+
             const batchSize = 100; // Define the size of each batch
             const batches = [];
 
@@ -53,36 +58,44 @@ export class BookMakerUpdateService implements OnModuleInit {
                 batches.push(eventbookmakers.slice(i, i + batchSize));
             }
 
+
+
             // Process each batch
             for (const batch of batches) {
                 await Promise.all(
                     batch.map(async (bookMakersUpdate: BookMakersUpdate) => {
                         try {
-                            await Promise.all(
-                                bookMakersUpdate.bookMakers.map(async (bookMaker: BookmakerData) => {
-                                    const market_id = bookMaker.market_id;
-                                    const bmStringified = JSON.stringify(bookMaker);
-                                    const timestamp = Date.now().toString();
-                                    const marketKey = `sb_${market_id}_1_${bookMaker.bookmaker_id}`;
-                                    await this.cacheService.hset(
-                                        configuration.redisPubClientFE,
-                                        marketKey,
-                                        'value',
-                                        bmStringified
-                                    );
-                                    await this.cacheService.hset(
-                                        configuration.redisPubClientFE,
-                                        marketKey,
-                                        'timestamp',
-                                        timestamp
-                                    );
-                                    await this.cacheService.publish(
-                                        configuration.redisPubClientFE,
-                                        `${market_id}_${bookMaker.bookmaker_id}`,
-                                        bmStringified
-                                    );
-                                })
-                            );
+
+                            const wls = this.whiteLabelService.getActiveWhiteLabelsId();
+
+                            for (let i = 0; i < wls.length; i++) {
+                                const wlbookmakers = await this.whiteLabelService.filterWLBookmakers(wls[i], bookMakersUpdate.bookMakers);
+                                await Promise.all(
+                                    wlbookmakers.map(async (bookMaker: BookmakerData) => {
+                                        const market_id = bookMaker.market_id;
+                                        const bmStringified = JSON.stringify(bookMaker);
+                                        const timestamp = Date.now().toString();
+                                        const marketKey = CachedKeys.getBookMaker(market_id, wls[i], bookMaker.bookmaker_id);
+                                        await this.cacheService.hset(
+                                            configuration.redisPubClientFE,
+                                            marketKey,
+                                            'value',
+                                            bmStringified
+                                        );
+                                        await this.cacheService.hset(
+                                            configuration.redisPubClientFE,
+                                            marketKey,
+                                            'timestamp',
+                                            timestamp
+                                        );
+                                        await this.cacheService.publish(
+                                            configuration.redisPubClientFE,
+                                            marketKey,
+                                            bmStringified
+                                        );
+                                    })
+                                );
+                            }
                         } catch (error) {
                             this.logger.error(
                                 `Error publishing book maker event to Redis: ${error.message}`,
@@ -92,6 +105,7 @@ export class BookMakerUpdateService implements OnModuleInit {
                     })
                 );
             }
+
         } catch (error) {
             this.logger.error(`processBookMakerMarketUpdate: ${error.message}`, BookMakerUpdateService.name);
         }
