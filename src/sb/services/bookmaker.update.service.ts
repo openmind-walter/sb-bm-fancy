@@ -1,4 +1,3 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
 import { LoggerService } from 'src/common/logger.service';
 import configuration from 'src/configuration';
 import { Subject } from 'rxjs';
@@ -7,49 +6,29 @@ import { CacheService } from 'src/cache/cache.service';
 import { BookmakerData } from 'src/model/bookmaker';
 import { WhiteLabelService } from './wl.service';
 import { CachedKeys } from 'src/common/cachedKeys';
+import { Process, Processor } from '@nestjs/bull';
+import { Job } from 'bull';
 
 
-@Injectable()
-export class BookMakerUpdateService implements OnModuleInit {
-    private bookMakerMarketUpdates$ = new Subject<BookMakersUpdate[]>();
+@Processor('bookMakerUpdate')
+export class BookMakerUpdateService {
 
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
         private whiteLabelService: WhiteLabelService
     ) {
-        this.bookMakerMarketUpdates$
-            .subscribe((updates) => this.processBookMakerMarketUpdates(updates));
-    }
 
-    onModuleInit() {
-
-        this.processsToBookMakerEvents();
     }
 
 
-
-    async processsToBookMakerEvents() {
+    @Process()
+    async processBookMakerMarketUpdates(job: Job) {
         try {
-            while (true) {
-                const task = await this.cacheService.brpop(configuration.sbTasksBookMaker, 0);
-                if (task) {
-                    const parsedTask = JSON.parse(task[1]);
-
-                    // this.logger.info(`Worker ${process.pid} processing task with : ${parsedTask.id}`, BookMakerUpdateService.name);
-                    const BookMakerMarket = parsedTask.data as BookMakersUpdate[];
-                    this.bookMakerMarketUpdates$.next(BookMakerMarket);
-                }
-            }
-        } catch (error) {
-            this.logger.error(`processsToBookMakerEvents: ${error.message}`, BookMakerUpdateService.name);
-        }
-    }
-
-    private async processBookMakerMarketUpdates(eventbookmakers: BookMakersUpdate[]) {
-        try {
-
-
+            const { message } = job.data;
+            const eventbookmakers = JSON.parse(message) as BookMakersUpdate[]
+            if (!eventbookmakers?.length) return;
+            console.log(eventbookmakers?.length)
             const batchSize = 100; // Define the size of each batch
             const batches = [];
 
@@ -57,8 +36,6 @@ export class BookMakerUpdateService implements OnModuleInit {
             for (let i = 0; i < eventbookmakers.length; i += batchSize) {
                 batches.push(eventbookmakers.slice(i, i + batchSize));
             }
-
-
 
             // Process each batch
             for (const batch of batches) {
