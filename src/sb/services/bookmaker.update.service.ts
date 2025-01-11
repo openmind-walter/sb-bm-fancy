@@ -1,13 +1,11 @@
 import { LoggerService } from 'src/common/logger.service';
 import configuration from 'src/configuration';
-import { Subject } from 'rxjs';
-import { BookMakersUpdate } from 'src/model/boomakerUpdate';
 import { CacheService } from 'src/cache/cache.service';
-import { BookmakerData } from 'src/model/bookmaker';
 import { WhiteLabelService } from './wl.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
+import { BookmakerMarket, BookMakersUpdate } from 'src/model/bookmaker';
 
 
 @Processor('bookMakerUpdate')
@@ -28,7 +26,7 @@ export class BookMakerUpdateService {
             const { message } = job.data;
             const eventbookmakers = JSON.parse(message) as BookMakersUpdate[]
             if (!eventbookmakers?.length) return;
-            console.log(eventbookmakers?.length)
+         
             const batchSize = 100; // Define the size of each batch
             const batches = [];
 
@@ -42,17 +40,16 @@ export class BookMakerUpdateService {
                 await Promise.all(
                     batch.map(async (bookMakersUpdate: BookMakersUpdate) => {
                         try {
-
                             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
-
                             for (let i = 0; i < wls.length; i++) {
                                 const wlbookmakers = await this.whiteLabelService.filterWLBookmakers(wls[i], bookMakersUpdate.bookMakers);
                                 await Promise.all(
-                                    wlbookmakers.map(async (bookMaker: BookmakerData) => {
-                                        const market_id = bookMaker.market_id;
+                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) => {
+                                     
+                                        const market_id = bookMaker.marketId;
                                         const bmStringified = JSON.stringify(bookMaker);
                                         const timestamp = Date.now().toString();
-                                        const marketKey = CachedKeys.getBookMaker(market_id, wls[i], bookMaker.bookmaker_id);
+                                        const marketKey = CachedKeys.getBookMaker(market_id, wls[i], bookMaker.providerId);
                                         await this.cacheService.hset(
                                             configuration.redisPubClientFE,
                                             marketKey,

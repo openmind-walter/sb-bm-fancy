@@ -1,4 +1,36 @@
-export class BookmakerRunner {
+import { Competition, EventType } from ".";
+
+
+
+export interface BookMakersUpdate {
+    eventId: string;
+    bookMakers: BookmakerMarket[];
+}[]
+
+export interface BookmakerMarket {
+    providerId: string;
+    marketId: string;
+    name: string;
+    eventId: string;
+    eventName?: string;
+    minBet: number;
+    isActive: number;
+    betAllow: number;
+    type: BookmakerType;
+    status: BookmakerStaus;
+    maxProfit: number;
+    betDelay: number;
+    oddType: BookmakerOddType;
+    offPlayMaxBet: number;
+    isOtherRateActive: number;
+    eventType?: EventType;
+    competition?: Competition;
+    runners: BookmakerRunner[];
+}
+
+
+
+export interface BookmakerRunner {
     name: string;
     selection_id: number;
     back_price: number;
@@ -8,36 +40,6 @@ export class BookmakerRunner {
     sort: number;
     status: BookmakerRunnerStaus;
 }
-
-export enum BookmakerRunnerStaus {
-    ACTIVE = "ACTIVE",
-    LOSER = "LOSER",
-    BALL_RUNNING = "BALL_RUNNING",
-    CLOSED = "CLOSED",
-    SUSPENDED = "SUSPENDED",
-    REMOVED = "REMOVED",
-    WINNER = "WINNER"
-}
-
-
-export class BookmakerData {
-    bookmaker_id: string;
-    bet_allow: number;
-    event_id: string;
-    market_id: string;
-    name: string;
-    min_bet: number;
-    is_active: number;
-    runners: Record<string, BookmakerRunner> | BookmakerRunner[];
-    type: BookmakerType;
-    status: BookmakerStaus;
-    max_profit: number;
-    bet_delay: number;
-    odd_type: BookmakerOddType;
-    off_play_max_bet: number;
-    is_other_rate_active: number;
-}
-
 
 export enum BookmakerType {
     MATCH_ODDS = 'MATCH_ODDS',
@@ -62,18 +64,19 @@ export enum BookmakerStaus {
 
 
 
-
-
-
-
-
-
-
-
-
-export class Bookmaker {
-    bookmaker_id: string;
-    data: BookmakerData;
+export enum BookmakerRunnerStaus {
+    ACTIVE = "ACTIVE",
+    LOSER = "LOSER",
+    BALL_RUNNING = "BALL_RUNNING",
+    CLOSED = "CLOSED",
+    SUSPENDED = "SUSPENDED",
+    REMOVED = "REMOVED",
+    WINNER = "WINNER"
 }
+
+
+
+
+
 
 

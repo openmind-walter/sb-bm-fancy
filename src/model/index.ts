@@ -1,6 +1,12 @@
 
-export class BookmakerWL {
-    DOMAIN_NAME: string;
-    ACTIVE_BOOKMAKERS:string;
-    INACTIVE_BOOKMAKERS:string  
-}
+
+export type EventType = {
+    children: any;
+    id: string;
+    name: string;
+};
+
+export type Competition = {
+    id: string;
+    name: string;
+};
