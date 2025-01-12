@@ -15,7 +15,7 @@ import { SBUpdateService } from './services/sb.update.service';
         BullModule.forRootAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
-                url: getSanitizedRedisUrl(configService.get<string>('DRAGONFLY_URL')),
+                url: getSanitizedRedisUrl(configService.get<string>('REDIS_BE_URL')),
                 limiter: {
                     max: 1000,
                     duration: 60000,
