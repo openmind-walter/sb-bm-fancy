@@ -1,0 +1,48 @@
+import { Competition, EventType } from ".";
+
+
+export interface FancyMarket {
+  providerId: string;
+  marketId: string;
+  eventId: string;
+  eventName?: string;
+  bettingType: string;
+  eventType?: EventType;
+  competition?: Competition;
+  runners: FancyMarketRunner[];
+}
+
+export interface FancyMarketRunner {
+  selectionId: number;
+  runnerName: string;
+  marketId: string;
+  eventId: string;
+  priority: number;
+  minBetSize: number;
+  maxBetSize: number;
+  maxMarketVolume: number;
+  priceYes: number;
+  priceNo: number;
+  spreadYes: number;
+  spreadNo: number;
+  priceResult?: number;
+  status: RunnerStaus;
+  inPlay: number;
+  isActive: number;
+  betAllow: number;
+  autoSuspendTime: string;
+  handicap: number;
+  providerId: string;
+}
+
+
+
+
+
+export enum RunnerStaus {
+  ACTIVE = "ACTIVE",
+  BALL_RUNNING = "BALL_RUNNING",
+  CLOSED = "CLOSED",
+  SUSPENDED = "SUSPENDED",
+  REMOVED = "REMOVED"
+}

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { BookmakerWLDto, WhiteLabel } from 'src/model/whiteLabel';
 import configuration from 'src/configuration';
-import { BookmakerData } from 'src/model/bookmaker';
+import { BookmakerMarket } from 'src/model/bookmaker';
 const BOOKMARKER_REDIS_FIELD = "bookmaker_ids"
 @Injectable()
 export class WhiteLabelService implements OnModuleInit {
@@ -55,8 +55,8 @@ export class WhiteLabelService implements OnModuleInit {
 
     async filterWLBookmakers(
         id: number,
-        bookmakerDataList: BookmakerData[],
-    ): Promise<BookmakerData[]> {
+        bookmakerDataList: BookmakerMarket[],
+    ): Promise<BookmakerMarket[]> {
         const domainName = this.activeWhiteLabels.find(wl => wl.ID === id)?.DOMAIN_NAME;
         if (!domainName) {
             this.logger.error(`White label with ID '${id}' not found`, WhiteLabelService.name);
@@ -70,8 +70,8 @@ export class WhiteLabelService implements OnModuleInit {
 
             const { active_bookmakers, inactive_bookmakers } = whiteLabelData;
             return bookmakerDataList.filter(bookmaker =>
-                active_bookmakers.includes(bookmaker.bookmaker_id) &&
-                !inactive_bookmakers.includes(bookmaker.bookmaker_id)
+                active_bookmakers.includes(bookmaker.providerId) &&
+                !inactive_bookmakers.includes(bookmaker.providerId)
             );
         } catch (error) {
             this.logger.error(
