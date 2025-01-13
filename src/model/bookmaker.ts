@@ -37,6 +37,7 @@ export interface BookmakerRunner {
     lay_price: number;
     back_volume: number;
     lay_volume: number;
+    handicap: number;
     sort: number;
     status: BookmakerRunnerStaus;
 }
