@@ -61,7 +61,6 @@ export class FancyUpdateService {
                     const existingRunner = existingFancyMarket.runners.find(r => r.selectionId === runner.selectionId);
                     if (!isEqual(existingRunner, runner)) {
                         changedRunners.push(runner);
-                        this.logger.info(`fancy event runner  update change event id: ${runner?.selectionId}  event: ${fancyMarket?.eventId}`, FancyUpdateService.name)
                     }
                 });
             }
@@ -77,7 +76,6 @@ export class FancyUpdateService {
                     marketPubKey,
                     JSON.stringify(marketPubUpdate)
                 );
-                this.logger.info(`fancy event   update   ${fancyMarket?.eventId}`, FancyUpdateService.name);
             }
 
         } catch (error) {

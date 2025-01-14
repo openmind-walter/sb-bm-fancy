@@ -82,7 +82,6 @@ export class BookMakerUpdateService {
             }
             if (bookMaker && !isEqual(bookMaker, newBookMaker)) {
                 changed = true;
-                this.logger.info(`bookmaker event update change event id: ${newBookMaker?.eventId}`, BookMakerUpdateService.name);
             }
                
             if (!bookMakerMarketHash || changed) {
@@ -95,7 +94,6 @@ export class BookMakerUpdateService {
                     marketPubKey,
                     JSON.stringify(bookMakerMarketUpdate)
                 );
-                this.logger.info(`bookmaker event update ${newBookMaker?.eventId}`, BookMakerUpdateService.name);
             }
 
         } catch (error) {
