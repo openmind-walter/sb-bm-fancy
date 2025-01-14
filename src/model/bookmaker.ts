@@ -9,6 +9,7 @@ export interface BookMakersUpdate {
 
 export interface BookmakerMarket {
     providerId: string;
+    serviceId: string;
     marketId: string;
     name: string;
     eventId: string;
@@ -25,18 +26,19 @@ export interface BookmakerMarket {
     isOtherRateActive: number;
     eventType?: EventType;
     competition?: Competition;
+    topic?: string;
     runners: BookmakerRunner[];
 }
 
 
 
 export interface BookmakerRunner {
-    name: string;
-    selection_id: number;
-    back_price: number;
-    lay_price: number;
-    back_volume: number;
-    lay_volume: number;
+    selectionId: number;
+    runnerName: string;
+    backPrice: number;
+    layPrice: number;
+    backVolume: number;
+    layVolume: number;
     handicap: number;
     sort: number;
     status: BookmakerRunnerStaus;

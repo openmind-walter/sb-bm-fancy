@@ -5,8 +5,10 @@ import { WhiteLabelService } from './wl.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
+import { isEqual } from 'lodash';
 import { BookmakerMarket, BookMakersUpdate } from 'src/model/bookmaker';
 
+const { redisPubClientFE, sbHashKey, dragonflyClient } = configuration;
 
 @Processor('bookMakerUpdate')
 export class BookMakerUpdateService {
@@ -22,11 +24,11 @@ export class BookMakerUpdateService {
 
     @Process()
     async processBookMakerMarketUpdates(job: Job) {
-        try {
+        try {      
             const { message } = job.data;
             const eventbookmakers = JSON.parse(message) as BookMakersUpdate[]
             if (!eventbookmakers?.length) return;
-         
+
             const batchSize = 100; // Define the size of each batch
             const batches = [];
 
@@ -37,38 +39,18 @@ export class BookMakerUpdateService {
 
             // Process each batch
             for (const batch of batches) {
+      
                 await Promise.all(
                     batch.map(async (bookMakersUpdate: BookMakersUpdate) => {
                         try {
                             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
                             for (let i = 0; i < wls.length; i++) {
-                                const wlbookmakers = await this.whiteLabelService.filterWLBookmakers(wls[i], bookMakersUpdate.bookMakers);
+     
+                                const wlbookmakers = bookMakersUpdate.bookMakers
+                                // await this.whiteLabelService.filterWLBookmakers(wls[i], bookMakersUpdate.bookMakers);
+                    
                                 await Promise.all(
-                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) => {
-                                     
-                                        const market_id = bookMaker.marketId;
-                                        const bmStringified = JSON.stringify(bookMaker);
-                                        const timestamp = Date.now().toString();
-                                        const marketKey = CachedKeys.getBookMaker(market_id, wls[i], bookMaker.providerId);
-                                        await this.cacheService.hset(
-                                            configuration.redisPubClientFE,
-                                            marketKey,
-                                            'value',
-                                            bmStringified
-                                        );
-                                        await this.cacheService.hset(
-                                            configuration.redisPubClientFE,
-                                            marketKey,
-                                            'timestamp',
-                                            timestamp
-                                        );
-                                        await this.cacheService.publish(
-                                            configuration.redisPubClientFE,
-                                            marketKey,
-                                            bmStringified
-                                        );
-                                    })
-                                );
+                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) =>this.updateBookMakerMarketHash(bookMaker, wls[i])));
                             }
                         } catch (error) {
                             this.logger.error(
@@ -84,6 +66,44 @@ export class BookMakerUpdateService {
             this.logger.error(`processBookMakerMarketUpdate: ${error.message}`, BookMakerUpdateService.name);
         }
     }
+
+
+    private async updateBookMakerMarketHash(newBookMaker: BookmakerMarket, wl: number) {
+        try {
+          
+            let changed = false;
+            const field = CachedKeys.getBookMakerHashField(newBookMaker.eventId,wl,newBookMaker.serviceId,newBookMaker.providerId);
+      
+            const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient,sbHashKey,field);
+            const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) : null;
+            delete  bookMaker.topic
+            if (bookMaker && !isEqual(bookMaker, newBookMaker)) 
+            {
+                changed = true;
+                this.logger.info(`bookmaker event  update change  event id: ${newBookMaker?.eventId}  `, BookMakerUpdateService.name)
+
+            }
+               
+            if (!bookMakerMarketHash || changed) {
+                const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId,wl,newBookMaker.serviceId,newBookMaker.providerId);
+                const bookMakerMarketUpdate = { ...newBookMaker, topic: marketPubKey };
+           
+                await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(bookMakerMarketUpdate));
+                await this.cacheService.publish(
+                    redisPubClientFE,
+                    marketPubKey,
+                    JSON.stringify(bookMakerMarketUpdate)
+                );
+                this.logger.info(`bookmaker event update   ${newBookMaker?.eventId}`, BookMakerUpdateService.name);
+            }
+
+        } catch (error) {
+            this.logger.error(`updateBookMakerMarketHash: ${error.message}`, BookMakerUpdateService.name);
+            return newBookMaker;
+        }
+    }
+
+
 }
 
 

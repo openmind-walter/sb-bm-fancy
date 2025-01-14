@@ -8,4 +8,5 @@ export default {
   dragonflyPubClient: 'DRAGONFLY_PUB',
   dragonflySubClient: 'DRAGONFLY_SUB',
   redisPubClientFE: 'redisFEclientPub',
+  sbHashKey: 'sb_hash_set'
 }

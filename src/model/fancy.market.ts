@@ -3,20 +3,20 @@ import { Competition, EventType } from ".";
 
 export interface FancyMarket {
   providerId: string;
+  serviceId: string;
   marketId: string;
   eventId: string;
   eventName?: string;
   bettingType: string;
   eventType?: EventType;
   competition?: Competition;
+  topic?: string;
   runners: FancyMarketRunner[];
 }
 
 export interface FancyMarketRunner {
   selectionId: number;
   runnerName: string;
-  marketId: string;
-  eventId: string;
   priority: number;
   minBetSize: number;
   maxBetSize: number;
