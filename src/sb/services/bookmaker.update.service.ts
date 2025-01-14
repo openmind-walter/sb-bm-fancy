@@ -70,18 +70,19 @@ export class BookMakerUpdateService {
 
     private async updateBookMakerMarketHash(newBookMaker: BookmakerMarket, wl: number) {
         try {
+            if (!newBookMaker) return
           
             let changed = false;
             const field = CachedKeys.getBookMakerHashField(newBookMaker.eventId,wl,newBookMaker.serviceId,newBookMaker.providerId);
       
-            const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient,sbHashKey,field);
+            const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
             const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) : null;
-            delete  bookMaker.topic
-            if (bookMaker && !isEqual(bookMaker, newBookMaker)) 
-            {
+            if (bookMaker) {
+                delete bookMaker.topic;
+            }
+            if (bookMaker && !isEqual(bookMaker, newBookMaker)) {
                 changed = true;
-                this.logger.info(`bookmaker event  update change  event id: ${newBookMaker?.eventId}  `, BookMakerUpdateService.name)
-
+                this.logger.info(`bookmaker event update change event id: ${newBookMaker?.eventId}`, BookMakerUpdateService.name);
             }
                
             if (!bookMakerMarketHash || changed) {
@@ -94,7 +95,7 @@ export class BookMakerUpdateService {
                     marketPubKey,
                     JSON.stringify(bookMakerMarketUpdate)
                 );
-                this.logger.info(`bookmaker event update   ${newBookMaker?.eventId}`, BookMakerUpdateService.name);
+                this.logger.info(`bookmaker event update ${newBookMaker?.eventId}`, BookMakerUpdateService.name);
             }
 
         } catch (error) {
