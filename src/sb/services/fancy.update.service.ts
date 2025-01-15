@@ -49,15 +49,13 @@ export class FancyUpdateService {
 
     private async updateFancyMarketHash(fancyMarket: FancyMarket, wl: number) {
         try {
+            const serviceId = `${wl}-${fancyMarket.serviceId}`;
             const changedRunners: FancyMarketRunner[] = [];
-            const field = CachedKeys.getFancyHashField(fancyMarket.eventId, wl, fancyMarket.serviceId, fancyMarket.providerId);
-            // console.log(field )
+            const field = CachedKeys.getFancyHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
             const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
             if (fancyMarketHash) {
-
                 const existingFancyMarket = JSON.parse(fancyMarketHash) as FancyMarket;
-
-                fancyMarket.runners.forEach(runner => {
+                fancyMarket?.runners.forEach(runner => {
                     const existingRunner = existingFancyMarket.runners.find(r => r.selectionId === runner.selectionId);
                     if (!isEqual(existingRunner, runner)) {
                         changedRunners.push(runner);
@@ -65,11 +63,9 @@ export class FancyUpdateService {
                 });
             }
             if (!fancyMarketHash || changedRunners.length > 0) {
-
                 const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
-                const fancyMarketUpdate = { ...fancyMarket, topic: marketPubKey };
+                const fancyMarketUpdate = { ...fancyMarket, serviceId, topic: marketPubKey };
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(fancyMarketUpdate));
-
                 const marketPubUpdate = changedRunners.length > 0 ? { ...fancyMarketUpdate, runners: changedRunners } : fancyMarketUpdate;
                 await this.cacheService.publish(
                     redisPubClientFE,
