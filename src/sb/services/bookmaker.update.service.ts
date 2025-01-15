@@ -6,7 +6,7 @@ import { CachedKeys } from 'src/common/cachedKeys';
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { isEqual } from 'lodash';
-import { BookmakerMarket, BookMakersUpdate } from 'src/model/bookmaker';
+import { BookmakerMarket, BookmakerRunnerStaus, BookMakersUpdate } from 'src/model/bookmaker';
 
 const { redisPubClientFE, sbHashKey, dragonflyClient } = configuration;
 
@@ -24,7 +24,7 @@ export class BookMakerUpdateService {
 
     @Process()
     async processBookMakerMarketUpdates(job: Job) {
-        try {      
+        try {
             const { message } = job.data;
             const eventbookmakers = JSON.parse(message) as BookMakersUpdate[]
             if (!eventbookmakers?.length) return;
@@ -39,18 +39,18 @@ export class BookMakerUpdateService {
 
             // Process each batch
             for (const batch of batches) {
-      
+
                 await Promise.all(
                     batch.map(async (bookMakersUpdate: BookMakersUpdate) => {
                         try {
                             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
                             for (let i = 0; i < wls.length; i++) {
-     
+
                                 const wlbookmakers = bookMakersUpdate.bookMakers
                                 // await this.whiteLabelService.filterWLBookmakers(wls[i], bookMakersUpdate.bookMakers);
-                    
+
                                 await Promise.all(
-                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) =>this.updateBookMakerMarketHash(bookMaker, wls[i])));
+                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) => this.updateBookMakerMarketHash(bookMaker, wls[i])));
                             }
                         } catch (error) {
                             this.logger.error(
@@ -71,10 +71,10 @@ export class BookMakerUpdateService {
     private async updateBookMakerMarketHash(newBookMaker: BookmakerMarket, wl: number) {
         try {
             if (!newBookMaker) return
-          
+
             let changed = false;
-            const field = CachedKeys.getBookMakerHashField(newBookMaker.eventId,wl,newBookMaker.serviceId,newBookMaker.providerId);
-      
+            const field = CachedKeys.getBookMakerHashField(newBookMaker.eventId, wl, newBookMaker.serviceId, newBookMaker.providerId);
+
             const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
             const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) : null;
             if (bookMaker) {
@@ -83,16 +83,16 @@ export class BookMakerUpdateService {
             if (bookMaker && !isEqual(bookMaker, newBookMaker)) {
                 changed = true;
             }
-               
+
             if (!bookMakerMarketHash || changed) {
-                const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId,wl,newBookMaker.serviceId,newBookMaker.providerId);
+                const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId, wl, newBookMaker.serviceId, newBookMaker.providerId);
                 const bookMakerMarketUpdate = { ...newBookMaker, topic: marketPubKey };
-           
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(bookMakerMarketUpdate));
+                const filteredBookMaker = this.filterOutSettledMarket(bookMakerMarketUpdate)
                 await this.cacheService.publish(
                     redisPubClientFE,
                     marketPubKey,
-                    JSON.stringify(bookMakerMarketUpdate)
+                    JSON.stringify(filteredBookMaker)
                 );
             }
 
@@ -102,6 +102,13 @@ export class BookMakerUpdateService {
         }
     }
 
+    private filterOutSettledMarket(bookmaker: BookmakerMarket) {
+        const runners = bookmaker?.runners.map(runner => {
+            return (runner?.status == BookmakerRunnerStaus.LOSER || runner?.status == BookmakerRunnerStaus.WINNER) ?
+                { ...runner, status: BookmakerRunnerStaus.CLOSED } : runner
+        });
+        return { ...bookmaker, runners };
+    }
 
 }
 

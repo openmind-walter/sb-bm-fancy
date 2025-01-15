@@ -12,7 +12,6 @@ export class CacheService implements OnModuleDestroy {
     this.initializeClient(configuration.dragonflyPubClient, process.env.DRAGONFLY_URL);
     this.initializeClient(configuration.dragonflySubClient, process.env.DRAGONFLY_URL);
     this.initializeClient(configuration.redisPubClientFE, process.env.REDIS_FE_URL);
-    this.initializeClient(configuration.redisPubClientFE, process.env.REDIS_FE_URL);
   }
 
   private initializeClient(clientName: string, url: string) {
