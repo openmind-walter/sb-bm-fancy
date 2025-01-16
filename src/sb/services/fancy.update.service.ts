@@ -63,8 +63,9 @@ export class FancyUpdateService {
                 });
             }
             if (!fancyMarketHash || changedRunners.length > 0) {
+                const updatedAt = (new Date()).toISOString();
                 const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
-                const fancyMarketUpdate = { ...fancyMarket, serviceId, topic: marketPubKey };
+                const fancyMarketUpdate = { ...fancyMarket, serviceId, topic: marketPubKey, updatedAt } as FancyMarket;
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(fancyMarketUpdate));
                 const marketPubUpdate = changedRunners.length > 0 ? { ...fancyMarketUpdate, runners: changedRunners } : fancyMarketUpdate;
                 await this.cacheService.publish(

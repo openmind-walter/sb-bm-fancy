@@ -85,8 +85,9 @@ export class BookMakerUpdateService {
             }
 
             if (!bookMakerMarketHash || changed) {
+                const updatedAt = (new Date()).toISOString();
                 const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId, wl, newBookMaker.serviceId, newBookMaker.providerId);
-                const bookMakerMarketUpdate = { ...newBookMaker, serviceId, topic: marketPubKey };
+                const bookMakerMarketUpdate = { ...newBookMaker, serviceId, topic: marketPubKey,updatedAt } as  BookmakerMarket;
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(bookMakerMarketUpdate));
                 const filteredBookMaker = this.filterOutSettledMarket(bookMakerMarketUpdate)
                 await this.cacheService.publish(

@@ -27,6 +27,7 @@ export interface BookmakerMarket {
     eventType?: EventType;
     competition?: Competition;
     topic?: string;
+    updatedAt?: string;
     runners: BookmakerRunner[];
 }
 

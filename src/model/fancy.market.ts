@@ -1,6 +1,5 @@
 import { Competition, EventType } from ".";
 
-
 export interface FancyMarket {
   providerId: string;
   serviceId: string;
@@ -12,6 +11,7 @@ export interface FancyMarket {
   competition?: Competition;
   topic?: string;
   runners: FancyMarketRunner[];
+  updatedAt?: string;
 }
 
 export interface FancyMarketRunner {
