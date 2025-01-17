@@ -5,8 +5,9 @@ import { WhiteLabelService } from './wl.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
-import { FancyMarket, FancyMarketRunner } from '../../model/fancy.market';
+import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from '../../model/fancy.market';
 import { isEqual } from 'lodash';
+import { SettlementService } from './settlement.service';
 
 
 const { redisPubClientFE, dragonflyClient, sbHashKey } = configuration;
@@ -16,7 +17,8 @@ export class FancyUpdateService {
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
-        private whiteLabelService: WhiteLabelService
+        private whiteLabelService: WhiteLabelService,
+        private settlementService: SettlementService
     ) { }
 
     @Process()
@@ -56,11 +58,13 @@ export class FancyUpdateService {
             if (fancyMarketHash) {
                 const existingFancyMarket = JSON.parse(fancyMarketHash) as FancyMarket;
                 fancyMarket?.runners.forEach(runner => {
-                    const existingRunner = existingFancyMarket.runners.find(r => r.selectionId === runner.selectionId);
+                    const existingRunner = existingFancyMarket.runners.find(r => r.selectionId == runner.selectionId);
                     if (!isEqual(existingRunner, runner)) {
                         changedRunners.push(runner);
                     }
                 });
+                const settledRunners = changedRunners.filter(runner => runner.status == FancyRunnerStaus.CLOSED || runner.status == FancyRunnerStaus.REMOVED);
+                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId, runner)));
             }
             if (!fancyMarketHash || changedRunners.length > 0) {
                 const updatedAt = (new Date()).toISOString();

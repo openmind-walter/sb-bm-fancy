@@ -7,6 +7,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { isEqual } from 'lodash';
 import { BookmakerMarket, BookmakerRunnerStaus, BookMakersUpdate } from 'src/model/bookmaker';
+import { SettlementService } from './settlement.service';
 
 const { redisPubClientFE, sbHashKey, dragonflyClient } = configuration;
 
@@ -16,7 +17,8 @@ export class BookMakerUpdateService {
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
-        private whiteLabelService: WhiteLabelService
+        private whiteLabelService: WhiteLabelService,
+        private settlementService: SettlementService
     ) {
 
     }
@@ -87,7 +89,7 @@ export class BookMakerUpdateService {
             if (!bookMakerMarketHash || changed) {
                 const updatedAt = (new Date()).toISOString();
                 const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId, wl, newBookMaker.serviceId, newBookMaker.providerId);
-                const bookMakerMarketUpdate = { ...newBookMaker, serviceId, topic: marketPubKey,updatedAt } as  BookmakerMarket;
+                const bookMakerMarketUpdate = { ...newBookMaker, serviceId, topic: marketPubKey, updatedAt } as BookmakerMarket;
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(bookMakerMarketUpdate));
                 const filteredBookMaker = this.filterOutSettledMarket(bookMakerMarketUpdate)
                 await this.cacheService.publish(
@@ -95,6 +97,9 @@ export class BookMakerUpdateService {
                     marketPubKey,
                     JSON.stringify(filteredBookMaker)
                 );
+
+                const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.CLOSED || runner.status == BookmakerRunnerStaus.REMOVED);
+                await Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId, runner, (newBookMaker.status))))
             }
 
         } catch (error) {

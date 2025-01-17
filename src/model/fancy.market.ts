@@ -26,7 +26,7 @@ export interface FancyMarketRunner {
   spreadYes: number;
   spreadNo: number;
   priceResult?: number;
-  status: RunnerStaus;
+  status: FancyRunnerStaus;
   inPlay: number;
   isActive: number;
   betAllow: number;
@@ -39,7 +39,7 @@ export interface FancyMarketRunner {
 
 
 
-export enum RunnerStaus {
+export enum FancyRunnerStaus {
   ACTIVE = "ACTIVE",
   BALL_RUNNING = "BALL_RUNNING",
   CLOSED = "CLOSED",
