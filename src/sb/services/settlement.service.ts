@@ -7,7 +7,6 @@ import { BettingType, SIDE } from 'src/model';
 import { BookmakerMarket, BookmakerRunner, BookmakerRunnerStaus, BookmakerStaus } from 'src/model/bookmaker';
 import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from 'src/model/fancy.market';
 import { PendingBet } from 'src/model/penndigBet';
-import { generateGUID } from 'src/utlities';
 import { Cron } from '@nestjs/schedule';
 import { CacheService } from 'src/cache/cache.service';
 import { CachedKeys } from 'src/common/cachedKeys';
@@ -39,9 +38,9 @@ export class SettlementService implements OnModuleInit {
                         (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && runner?.priceResult >= penndingBets[i].PRICE) ||
                         (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
                     )
-                        await this.betSettlement(penndingBets[i].ID, 1, penndingBets[i].SIZE)
+                        await this.betSettlement(penndingBets[i].ID, 1, penndingBets[i].SIZE, penndingBets[i].BF_BET_ID)
                     else
-                        await this.betSettlement(penndingBets[i].ID, 0, penndingBets[i].SIZE)
+                        await this.betSettlement(penndingBets[i].ID, 0, penndingBets[i].SIZE, penndingBets[i].BF_BET_ID)
                 }
             }
         } catch (error) {
@@ -64,9 +63,9 @@ export class SettlementService implements OnModuleInit {
                     await this.betVoided(penndingBets[i].ID);
                 } else
                     if (runner.status == BookmakerRunnerStaus.WINNER) {
-                        await this.betSettlement(penndingBets[i].ID, penndingBets[i].SIDE == SIDE.BACK ? 1 : 0, runner.backVolume);
+                        await this.betSettlement(penndingBets[i].ID, penndingBets[i].SIDE == SIDE.BACK ? 1 : 0, runner.backVolume, penndingBets[i].BF_BET_ID);
                     } else if (runner.status == BookmakerRunnerStaus.LOSER) {
-                        await this.betSettlement(penndingBets[i].ID, penndingBets[i].SIDE == SIDE.LAY ? 1 : 0, runner.backVolume);
+                        await this.betSettlement(penndingBets[i].ID, penndingBets[i].SIDE == SIDE.LAY ? 1 : 0, runner.backVolume, penndingBets[i].BF_BET_ID);
                     } else if (runner.status == BookmakerRunnerStaus.REMOVED) {
                         await this.betVoided(penndingBets[i].ID);
                     }
@@ -93,9 +92,9 @@ export class SettlementService implements OnModuleInit {
     }
 
 
-    private async betSettlement(BF_PLACEBET_ID, RESULT: 0 | 1, BF_SIZE: number) {
+    private async betSettlement(BF_PLACEBET_ID, RESULT: 0 | 1, BF_SIZE: number, BF_BET_ID) {
         try {
-            const BF_BET_ID = generateGUID();
+            BF_PLACEBET_ID
             const respose = (await axios.post(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_settlement`, { BF_BET_ID, BF_PLACEBET_ID, RESULT, BF_SIZE }))?.data;
             if (!respose?.result || respose?.status == "error") {
                 this.logger.error(`Error on  bet settlement: ${respose?.status}`, SettlementService.name);
@@ -145,7 +144,7 @@ export class SettlementService implements OnModuleInit {
                         if (bookMaker) {
                             const runner = bookMaker.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                             if (runner)
-                                this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status)
+                                await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status)
                         }
                     }
                     else if (bet.BETTING_TYPE == BettingType.FANCY) {
@@ -155,7 +154,7 @@ export class SettlementService implements OnModuleInit {
                         if (fancy) {
                             const runner = fancy.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                             if (runner)
-                                this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner)
+                                await this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner)
                         }
                     }
 

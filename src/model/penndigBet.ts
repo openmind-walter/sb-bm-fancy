@@ -11,4 +11,5 @@ export class PendingBet {
     PROVIDER_ID: string;
     PRICE: number;
     BETTING_TYPE: string;
+    BF_BET_ID:string;
 }
