@@ -64,7 +64,7 @@ export class FancyUpdateService {
                     }
                 });
                 const settledRunners = changedRunners.filter(runner => runner.status == FancyRunnerStaus.CLOSED || runner.status == FancyRunnerStaus.REMOVED);
-                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId, runner)));
+                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId,fancyMarket.providerId, runner)));
             }
             if (!fancyMarketHash || changedRunners.length > 0) {
                 const updatedAt = (new Date()).toISOString();

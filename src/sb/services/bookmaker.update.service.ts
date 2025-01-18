@@ -99,7 +99,7 @@ export class BookMakerUpdateService {
                 );
 
                 const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.CLOSED || runner.status == BookmakerRunnerStaus.REMOVED);
-                await Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId, runner, (newBookMaker.status))))
+                await Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId , newBookMaker.providerId, runner, (newBookMaker.status))))
             }
 
         } catch (error) {

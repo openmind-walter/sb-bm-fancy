@@ -1,27 +1,35 @@
 
-import { Injectable, } from '@nestjs/common';
+import { Injectable, OnModuleInit, } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { LoggerService } from 'src/common/logger.service';
-import { SIDE } from 'src/model';
-import { BookmakerRunner, BookmakerRunnerStaus, BookmakerStaus } from 'src/model/bookmaker';
-import { FancyMarketRunner, FancyRunnerStaus } from 'src/model/fancy.market';
+import { BettingType, SIDE } from 'src/model';
+import { BookmakerMarket, BookmakerRunner, BookmakerRunnerStaus, BookmakerStaus } from 'src/model/bookmaker';
+import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from 'src/model/fancy.market';
 import { PendingBet } from 'src/model/penndigBet';
 import { generateGUID } from 'src/utlities';
+import { Cron } from '@nestjs/schedule';
+import { CacheService } from 'src/cache/cache.service';
+import { CachedKeys } from 'src/common/cachedKeys';
+import configuration from 'src/configuration';
 
+const { dragonflyClient, sbHashKey } = configuration;
 @Injectable()
-export class SettlementService {
+export class SettlementService implements OnModuleInit {
 
     constructor(
         private configService: ConfigService,
-        private logger: LoggerService
+        private logger: LoggerService,
+        private readonly cacheService: CacheService,
     ) { }
+    async onModuleInit() {
+        await this.checkSettlementOfBet();
+    }
 
 
-    async fancyBetSettlement(marketId: string, runner: FancyMarketRunner) {
+    async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner) {
         try {
-            if (!(runner.status == FancyRunnerStaus.REMOVED || runner.status == FancyRunnerStaus.CLOSED)) return
-            const penndingBets = await this.getPendingBets(marketId, runner.selectionId)
+            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId)
             if (penndingBets?.length == 0) return;
             for (let i = 0; i < penndingBets.length; i++) {
                 if (runner.status == FancyRunnerStaus.REMOVED) {
@@ -46,10 +54,9 @@ export class SettlementService {
 
 
 
-    async bookMakerBetSettlement(marketId: string, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus) {
+    async bookMakerBetSettlement(marketId: string, providerId, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus) {
         try {
-            if (!(bookmakerStatus == BookmakerStaus.REMOVED || bookmakerStatus == BookmakerStaus.CLOSED)) return
-            const penndingBets = await this.getPendingBets(marketId, runner.selectionId)
+            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId)
             if (penndingBets?.length == 0) return;
 
             for (let i = 0; i < penndingBets.length; i++) {
@@ -74,10 +81,11 @@ export class SettlementService {
 
 
 
-    private async getPendingBets(marketId: string, selectionId) {
+    private async getPendingBets(marketId: string, providerId, selectionId) {
         try {
-            const penndingBetsResponse = await axios.get(`${this.configService.get("API_SERVER_URL")}/v1/api/bf_placebet/pending_by_market/${marketId}/${selectionId}`);
+            const penndingBetsResponse = await axios.get(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_placebet/pending_market/${marketId}/${selectionId}/${providerId}`);
             const penndingBets = (penndingBetsResponse?.data?.result || []) as PendingBet[];
+            console.log('get pending bet  for', marketId, providerId, selectionId, penndingBets)
             return penndingBets;
         } catch (error) {
             this.logger.error(`Error get pending Bets from api service ${error.message}`, SettlementService.name);
@@ -93,7 +101,7 @@ export class SettlementService {
                 this.logger.error(`Error on  bet settlement: ${respose?.status}`, SettlementService.name);
             }
             else
-            this.logger.info(`uplace bet Settlement , place bet id: ${BF_PLACEBET_ID}  `, SettlementService.name);
+                this.logger.info(`uplace bet Settlement , place bet id: ${BF_PLACEBET_ID}  `, SettlementService.name);
         } catch (error) {
             this.logger.error(`Error on book maker bet settlement: ${error.message}`, SettlementService.name);
         }
@@ -113,6 +121,50 @@ export class SettlementService {
 
         } catch (error) {
             this.logger.error(`Error on bet voided : ${error.message}`, SettlementService.name);
+        }
+
+    }
+
+    //  @Cron(`*/5 * * * *`)
+    private async checkSettlementOfBet() {
+
+        try {
+            const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending`))?.data;
+
+            if (!respose?.result || respose?.status == "error") {
+                this.logger.error(`Error on get SB pennding  bets on check settlement : ${respose?.status}`, SettlementService.name);
+            }
+            else {
+                const penndingBets = (respose?.result || []) as PendingBet[];
+                for (let i = 0; i < penndingBets.length; i++) {
+                    const bet = penndingBets[i];
+                    if (bet.BETTING_TYPE == BettingType.BOOKMAKER) {
+                        const field = CachedKeys.getBookMakerHashField(bet.EVENT_ID, bet.SERVICE_ID, bet.PROVIDER_ID);
+                        const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
+                        const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) as BookmakerMarket : null;
+                        if (bookMaker) {
+                            const runner = bookMaker.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
+                            if (runner)
+                                this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status)
+                        }
+                    }
+                    else if (bet.BETTING_TYPE == BettingType.FANCY) {
+                        const field = CachedKeys.getFancyHashField(bet.EVENT_ID, bet.SERVICE_ID, bet.PROVIDER_ID);
+                        const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
+                        const fancy = fancyMarketHash ? JSON.parse(fancyMarketHash) as FancyMarket : null;
+                        if (fancy) {
+                            const runner = fancy.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
+                            if (runner)
+                                this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner)
+                        }
+                    }
+
+                }
+
+            }
+
+        } catch (error) {
+            this.logger.error(`Error on check settlement Of Bet : ${error.message}`, SettlementService.name);
         }
 
     }
