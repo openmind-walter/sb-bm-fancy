@@ -91,6 +91,10 @@ export class SettlementService implements OnModuleInit {
     private async getPendingBets(marketId: string, providerId, selectionId) {
         try {
             const penndingBetsResponse = await axios.get(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_placebet/pending_market/${marketId}/${selectionId}/${providerId}`);
+            if (!penndingBetsResponse?.data.result || penndingBetsResponse?.data?.status == "error") {
+                this.logger.error(`Error on getPendingBets: ${penndingBetsResponse?.data.result}`, SettlementService.name);
+            }
+
             const penndingBets = (penndingBetsResponse?.data?.result || []) as PendingBet[];
             console.log('get pending bet  for', marketId, providerId, selectionId, penndingBets, penndingBets?.length)
             return penndingBets;
