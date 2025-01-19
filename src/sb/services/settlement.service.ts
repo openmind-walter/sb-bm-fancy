@@ -12,6 +12,12 @@ import { CacheService } from 'src/cache/cache.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import configuration from 'src/configuration';
 
+
+enum SettlementResult {
+    'WIN' = "WIN",
+    "LOST" = "LOST"
+}
+
 const { dragonflyClient, sbHashKey } = configuration;
 @Injectable()
 export class SettlementService implements OnModuleInit {
@@ -28,7 +34,9 @@ export class SettlementService implements OnModuleInit {
 
     async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner) {
         try {
-            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId)
+
+            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId);
+            this.logger.info(`on fancy bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
             if (penndingBets?.length == 0) return;
             for (let i = 0; i < penndingBets.length; i++) {
                 if (runner.status == FancyRunnerStaus.REMOVED) {
@@ -38,9 +46,9 @@ export class SettlementService implements OnModuleInit {
                         (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && runner?.priceResult >= penndingBets[i].PRICE) ||
                         (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
                     )
-                        await this.betSettlement(penndingBets[i].ID, 1, penndingBets[i].SIZE, penndingBets[i].BF_BET_ID)
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WIN)
                     else
-                        await this.betSettlement(penndingBets[i].ID, 0, penndingBets[i].SIZE, penndingBets[i].BF_BET_ID)
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.LOST)
                 }
             }
         } catch (error) {
@@ -55,17 +63,17 @@ export class SettlementService implements OnModuleInit {
 
     async bookMakerBetSettlement(marketId: string, providerId, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus) {
         try {
-            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId)
+            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId);
             if (penndingBets?.length == 0) return;
-
+            this.logger.info(`on  bookMaker bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
             for (let i = 0; i < penndingBets.length; i++) {
                 if (bookmakerStatus == BookmakerStaus.REMOVED) {
                     await this.betVoided(penndingBets[i].ID);
                 } else
                     if (runner.status == BookmakerRunnerStaus.WINNER) {
-                        await this.betSettlement(penndingBets[i].ID, penndingBets[i].SIDE == SIDE.BACK ? 1 : 0, runner.backVolume, penndingBets[i].BF_BET_ID);
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, penndingBets[i].SIDE == SIDE.BACK ? SettlementResult.WIN : SettlementResult.LOST);
                     } else if (runner.status == BookmakerRunnerStaus.LOSER) {
-                        await this.betSettlement(penndingBets[i].ID, penndingBets[i].SIDE == SIDE.LAY ? 1 : 0, runner.backVolume, penndingBets[i].BF_BET_ID);
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, penndingBets[i].SIDE == SIDE.LAY ? SettlementResult.WIN : SettlementResult.LOST);
                     } else if (runner.status == BookmakerRunnerStaus.REMOVED) {
                         await this.betVoided(penndingBets[i].ID);
                     }
@@ -84,7 +92,7 @@ export class SettlementService implements OnModuleInit {
         try {
             const penndingBetsResponse = await axios.get(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_placebet/pending_market/${marketId}/${selectionId}/${providerId}`);
             const penndingBets = (penndingBetsResponse?.data?.result || []) as PendingBet[];
-            console.log('get pending bet  for', marketId, providerId, selectionId, penndingBets)
+            console.log('get pending bet  for', marketId, providerId, selectionId, penndingBets, penndingBets?.length)
             return penndingBets;
         } catch (error) {
             this.logger.error(`Error get pending Bets from api service ${error.message}`, SettlementService.name);
@@ -92,17 +100,16 @@ export class SettlementService implements OnModuleInit {
     }
 
 
-    private async betSettlement(BF_PLACEBET_ID, RESULT: 0 | 1, BF_SIZE: number, BF_BET_ID) {
+    private async betSettlement(BF_BET_ID, RESULT: SettlementResult) {
         try {
-            BF_PLACEBET_ID
-            const respose = (await axios.post(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_settlement`, { BF_BET_ID, BF_PLACEBET_ID, RESULT, BF_SIZE }))?.data;
+            const respose = (await axios.post(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_placebet/status/update_settled`, { BF_BET_ID, RESULT }))?.data;
             if (!respose?.result || respose?.status == "error") {
                 this.logger.error(`Error on  bet settlement: ${respose?.status}`, SettlementService.name);
             }
             else
-                this.logger.info(`uplace bet Settlement , place bet id: ${BF_PLACEBET_ID}  `, SettlementService.name);
+                this.logger.info(`update bet Settlement  bf_ bet id: ${BF_BET_ID}  `, SettlementService.name);
         } catch (error) {
-            this.logger.error(`Error on book maker bet settlement: ${error.message}`, SettlementService.name);
+            this.logger.error(`Error on  bet settlement: ${error.message}`, SettlementService.name);
         }
     }
 
@@ -131,7 +138,7 @@ export class SettlementService implements OnModuleInit {
             const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending`))?.data;
 
             if (!respose?.result || respose?.status == "error") {
-                this.logger.error(`Error on get SB pennding  bets on check settlement : ${respose?.status}`, SettlementService.name);
+                this.logger.error(`Error on get SB pennding  bets from DB on check settlement : ${respose?.status}`, SettlementService.name);
             }
             else {
                 const penndingBets = (respose?.result || []) as PendingBet[];
