@@ -14,7 +14,7 @@ import configuration from 'src/configuration';
 
 
 enum SettlementResult {
-    'WIN' = "WIN",
+    'WON' = "WON",
     "LOST" = "LOST"
 }
 
@@ -46,7 +46,7 @@ export class SettlementService implements OnModuleInit {
                         (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && runner?.priceResult >= penndingBets[i].PRICE) ||
                         (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
                     )
-                        await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WIN)
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WON)
                     else
                         await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.LOST)
                 }
@@ -71,9 +71,9 @@ export class SettlementService implements OnModuleInit {
                     await this.betVoided(penndingBets[i].ID);
                 } else
                     if (runner.status == BookmakerRunnerStaus.WINNER) {
-                        await this.betSettlement(penndingBets[i].BF_BET_ID, penndingBets[i].SIDE == SIDE.BACK ? SettlementResult.WIN : SettlementResult.LOST);
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, penndingBets[i].SIDE == SIDE.BACK ? SettlementResult.WON : SettlementResult.LOST);
                     } else if (runner.status == BookmakerRunnerStaus.LOSER) {
-                        await this.betSettlement(penndingBets[i].BF_BET_ID, penndingBets[i].SIDE == SIDE.LAY ? SettlementResult.WIN : SettlementResult.LOST);
+                        await this.betSettlement(penndingBets[i].BF_BET_ID, penndingBets[i].SIDE == SIDE.LAY ? SettlementResult.WON : SettlementResult.LOST);
                     } else if (runner.status == BookmakerRunnerStaus.REMOVED) {
                         await this.betVoided(penndingBets[i].ID);
                     }
