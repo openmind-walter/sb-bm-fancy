@@ -68,7 +68,18 @@ export class FancyUpdateService {
                 const settledRunners = changedRunners.filter(runner => runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED);
                 await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId, fancyMarket.providerId, runner)));
                 if (settledRunners.length > 0) {
-                    console.log("settled fancy runner", fancyMarket?.eventId, fancyMarket?.marketId, settledRunners[0])
+                    console.log(
+                        "Settled fancy runner:",
+                        JSON.stringify(
+                            {
+                                eventId: fancyMarket?.eventId,
+                                marketId: fancyMarket?.marketId,
+                                settledRunner: settledRunners[0],
+                            },
+                            null,
+                            2
+                        )
+                    );
                 }
 
             }
