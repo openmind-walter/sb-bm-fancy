@@ -25,14 +25,13 @@ export class FancyUpdateService {
     async processFancyMarketUpdates(job: Job) {
         try {
             const { message } = job.data;
-            const fancyMarket = JSON.parse(message) as FancyMarket[]
-            if (!fancyMarket?.length) return;
+            const fancyMarkets = JSON.parse(message) as FancyMarket[]
+            if (!fancyMarkets?.length) return;
             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
-            const batchSize = 100;
-            for (let i = 0; i < fancyMarket.length; i += batchSize) {
-                const batch = fancyMarket.slice(i, i + batchSize);
+
+            for (let i = 0; i < wls.length; i++) {
                 await Promise.all(
-                    batch.map(async (market) => {
+                    fancyMarkets.map(async (market) => {
                         for (let i = 0; i < wls.length; i++) {
                             if (market.runners?.length > 0) {
                                 await this.updateFancyMarketHash(market, wls[i])
@@ -55,23 +54,32 @@ export class FancyUpdateService {
             const changedRunners: FancyMarketRunner[] = [];
             const field = CachedKeys.getFancyHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
             const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
-            if (fancyMarketHash) {
-                const existingFancyMarket = JSON.parse(fancyMarketHash) as FancyMarket;
+            let existingFancyMarket = fancyMarketHash ? JSON.parse(fancyMarketHash) as FancyMarket as FancyMarket : null;
+            if (existingFancyMarket) {
                 fancyMarket?.runners.forEach(runner => {
-                    const existingRunner = existingFancyMarket.runners.find(r => r.selectionId == runner.selectionId);
-                    if (!isEqual(existingRunner, runner)) {
-                        changedRunners.push(runner);
+                    if (existingFancyMarket?.runners?.length > 0) {
+                        const existingRunner = existingFancyMarket?.runners?.find(r => r.selectionId == runner.selectionId);
+                        if (!isEqual(existingRunner, runner) && existingRunner) {
+                            console.log(existingFancyMarket?.eventId, existingFancyMarket?.runners?.length, existingRunner)
+                            changedRunners.push(runner);
+                        }
                     }
                 });
-                const settledRunners = changedRunners.filter(runner => runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED);
-                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId,fancyMarket.providerId, runner)));
+                const settledRunners = changedRunners.filter(runner => runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED);
+                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId, fancyMarket.providerId, runner)));
+                if (settledRunners.length > 0) {
+                    console.log("settled fancy runner", fancyMarket?.eventId, fancyMarket?.marketId, settledRunners[0])
+                }
+
             }
+
             if (!fancyMarketHash || changedRunners.length > 0) {
                 const updatedAt = (new Date()).toISOString();
                 const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
-                const fancyMarketUpdate = { ...fancyMarket, serviceId, topic: marketPubKey, updatedAt } as FancyMarket;
+                const runnerUpdate = existingFancyMarket?.runners?.length ? [...existingFancyMarket?.runners, ...fancyMarket?.runners] : fancyMarket?.runners;
+                const fancyMarketUpdate = { ...fancyMarket, serviceId, runners: runnerUpdate, topic: marketPubKey, updatedAt } as FancyMarket;
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(fancyMarketUpdate));
-                const marketPubUpdate = changedRunners.length > 0 ? { ...fancyMarketUpdate, runners: changedRunners } : fancyMarketUpdate;
+                const marketPubUpdate = changedRunners?.length > 0 ? { ...fancyMarketUpdate, runners: changedRunners } : fancyMarketUpdate;
                 await this.cacheService.publish(
                     redisPubClientFE,
                     marketPubKey,
