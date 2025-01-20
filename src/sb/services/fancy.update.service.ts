@@ -63,7 +63,7 @@ export class FancyUpdateService {
                         changedRunners.push(runner);
                     }
                 });
-                const settledRunners = changedRunners.filter(runner => runner.status == FancyRunnerStaus.CLOSED || runner.status == FancyRunnerStaus.REMOVED);
+                const settledRunners = changedRunners.filter(runner => runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED);
                 await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId,fancyMarket.providerId, runner)));
             }
             if (!fancyMarketHash || changedRunners.length > 0) {

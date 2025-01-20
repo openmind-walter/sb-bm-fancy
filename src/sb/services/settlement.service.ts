@@ -32,10 +32,10 @@ export class SettlementService implements OnModuleInit {
     }
 
 
-    async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner) {
+    async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner, pendingPlaceBets?: PendingBet[]) {
         try {
 
-            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId);
+            const penndingBets = pendingPlaceBets ? pendingPlaceBets : await this.getPendingBets(marketId, providerId, runner.selectionId);
             this.logger.info(`on fancy bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
             if (penndingBets?.length == 0) return;
             for (let i = 0; i < penndingBets.length; i++) {
@@ -61,9 +61,9 @@ export class SettlementService implements OnModuleInit {
 
 
 
-    async bookMakerBetSettlement(marketId: string, providerId, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus) {
+    async bookMakerBetSettlement(marketId: string, providerId, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus, pendingPlaceBets?: PendingBet[]) {
         try {
-            const penndingBets = await this.getPendingBets(marketId, providerId, runner.selectionId);
+            const penndingBets = pendingPlaceBets ? pendingPlaceBets : await this.getPendingBets(marketId, providerId, runner.selectionId);
             if (penndingBets?.length == 0) return;
             this.logger.info(`on  bookMaker bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
             for (let i = 0; i < penndingBets.length; i++) {
@@ -155,7 +155,7 @@ export class SettlementService implements OnModuleInit {
                         if (bookMaker) {
                             const runner = bookMaker.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                             if (runner)
-                                await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status)
+                                await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [penndingBets[i]])
                         }
                     }
                     else if (bet.BETTING_TYPE == BettingType.FANCY) {
@@ -165,7 +165,7 @@ export class SettlementService implements OnModuleInit {
                         if (fancy) {
                             const runner = fancy.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                             if (runner)
-                                await this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner)
+                                await this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner, [penndingBets[i]])
                         }
                     }
 
