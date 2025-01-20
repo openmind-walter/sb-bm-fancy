@@ -60,7 +60,6 @@ export class FancyUpdateService {
                     if (existingFancyMarket?.runners?.length > 0) {
                         const existingRunner = existingFancyMarket?.runners?.find(r => r.selectionId == runner.selectionId);
                         if (!isEqual(existingRunner, runner) && existingRunner) {
-                            console.log(existingFancyMarket?.eventId, existingFancyMarket?.runners?.length, existingRunner)
                             changedRunners.push(runner);
                         }
                     }
