@@ -96,7 +96,6 @@ export class SettlementService implements OnModuleInit {
             }
 
             const penndingBets = (penndingBetsResponse?.data?.result || []) as PendingBet[];
-            console.log('get pending bet  for', marketId, providerId, selectionId, penndingBets, penndingBets?.length)
             return penndingBets;
         } catch (error) {
             this.logger.error(`Error get pending Bets from api service ${error.message}`, SettlementService.name);
