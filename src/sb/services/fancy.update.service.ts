@@ -74,7 +74,7 @@ export class FancyUpdateService {
                             {
                                 eventId: fancyMarket?.eventId,
                                 marketId: fancyMarket?.marketId,
-                                settledRunner: settledRunners[0],
+                                settledRunners,
                             },
                             null,
                             2
