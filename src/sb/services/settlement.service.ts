@@ -34,7 +34,9 @@ export class SettlementService implements OnModuleInit {
 
     async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner, pendingPlaceBets?: PendingBet[]) {
         try {
-            this.logger.info(`on fancy bet settlement called  selection: ${runner.selectionId}  marketid: ${marketId} `, SettlementService.name);
+            if (!(runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED))
+                return;
+            this.logger.info(`on fancy bet settlement called  selection id : ${runner.selectionId}  marketid: ${marketId} `, SettlementService.name);
             const penndingBets = pendingPlaceBets ? pendingPlaceBets : await this.getPendingBets(marketId, providerId, runner.selectionId);
             this.logger.info(`on fancy bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
             if (penndingBets?.length == 0) return;
@@ -47,8 +49,10 @@ export class SettlementService implements OnModuleInit {
                         (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
                     )
                         await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WON)
-                    else
+                    else if (runner?.priceResult)
                         await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.LOST)
+                    else
+                        this.logger.error(`fancy market closed but got null result for bet event id ${penndingBets[i]?.EVENT_ID} ,id ${penndingBets[i]?.ID} selection id ${penndingBets[i]?.SELECTION_ID}`, SettlementService.name)
                 }
             }
         } catch (error) {
@@ -63,6 +67,10 @@ export class SettlementService implements OnModuleInit {
 
     async bookMakerBetSettlement(marketId: string, providerId, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus, pendingPlaceBets?: PendingBet[]) {
         try {
+
+            if (!(runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER
+                || runner.status == BookmakerRunnerStaus.REMOVED)) return;
+
             const penndingBets = pendingPlaceBets ? pendingPlaceBets : await this.getPendingBets(marketId, providerId, runner.selectionId);
             if (penndingBets?.length == 0) return;
             this.logger.info(`on  bookMaker bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
@@ -92,7 +100,7 @@ export class SettlementService implements OnModuleInit {
         try {
             const penndingBetsResponse = await axios.get(`${this.configService.get("API_SERVER_URL")}/v1/api/sb_placebet/pending_market/${marketId}/${selectionId}/${providerId}`);
             if (!penndingBetsResponse?.data.result || penndingBetsResponse?.data?.status == "error") {
-                this.logger.error(`Error on getPendingBets: ${penndingBetsResponse?.data.result}`, SettlementService.name);
+                this.logger.error(`Error on get pending bets: ${penndingBetsResponse?.data.result}`, SettlementService.name);
             }
 
             const penndingBets = (penndingBetsResponse?.data?.result || []) as PendingBet[];
@@ -155,7 +163,9 @@ export class SettlementService implements OnModuleInit {
                             const runner = bookMaker.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                             if (runner)
                                 await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [penndingBets[i]])
-                        }
+                        } else
+                            this.logger.error(`bookMaker maket not found from cache id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name)
+
                     }
                     else if (bet.BETTING_TYPE == BettingType.FANCY) {
                         const field = CachedKeys.getFancyHashField(bet.EVENT_ID, bet.SERVICE_ID, bet.PROVIDER_ID);
@@ -166,6 +176,8 @@ export class SettlementService implements OnModuleInit {
                             if (runner)
                                 await this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner, [penndingBets[i]])
                         }
+                        else
+                            this.logger.error(`fancy maket not found from cache id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet?.MARKET_ID}`, SettlementService.name)
                     }
 
                 }
