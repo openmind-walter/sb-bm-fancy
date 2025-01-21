@@ -34,7 +34,7 @@ export class SettlementService implements OnModuleInit {
 
     async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner, pendingPlaceBets?: PendingBet[]) {
         try {
-
+            this.logger.info(`on fancy bet settlement called  selection: ${runner.selectionId}  marketid: ${marketId} `, SettlementService.name);
             const penndingBets = pendingPlaceBets ? pendingPlaceBets : await this.getPendingBets(marketId, providerId, runner.selectionId);
             this.logger.info(`on fancy bet settlement  ${penndingBets?.length} pennding bets  `, SettlementService.name);
             if (penndingBets?.length == 0) return;

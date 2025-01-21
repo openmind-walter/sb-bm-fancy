@@ -92,6 +92,15 @@ export class CacheService implements OnModuleDestroy {
     return redis ? await redis.hget(key, field) : null;
   }
 
+  async hDel(client: string, key: string, field: string): Promise<boolean> {
+    const redis = this.getClient(client);
+    if (redis) {
+        const result = await redis.hdel(key, field);
+        return result > 0; // hdel returns the number of fields removed, if any
+    }
+    return false;
+}
+
   async onModuleDestroy() {
     for (const client of Object.values(this.clients)) {
       await client.quit();

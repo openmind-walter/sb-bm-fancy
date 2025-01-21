@@ -65,7 +65,7 @@ export class FancyUpdateService {
                     }
                 });
                 const settledRunners = changedRunners.filter(runner => runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED);
-                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId, fancyMarket.providerId, runner)));
+
                 if (settledRunners.length > 0) {
                     console.log(
                         "Settled fancy runner:",
@@ -80,13 +80,20 @@ export class FancyUpdateService {
                         )
                     );
                 }
-
+                await Promise.all(settledRunners.map(runner => this.settlementService.fancyBetSettlement(fancyMarket.marketId, fancyMarket.providerId, runner)));
             }
 
             if (!fancyMarketHash || changedRunners.length > 0) {
                 const updatedAt = (new Date()).toISOString();
                 const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
-                const runnerUpdate = existingFancyMarket?.runners?.length ? [...existingFancyMarket?.runners, ...fancyMarket?.runners] : fancyMarket?.runners;
+                const runnerUpdate = fancyMarket?.runners
+                    ? [
+                        ...fancyMarket.runners,
+                        ...(existingFancyMarket?.runners?.filter(existingRunner =>
+                            !fancyMarket.runners.some(fancyRunner => fancyRunner.selectionId == existingRunner.selectionId)
+                        ) || []),
+                    ]
+                    : existingFancyMarket?.runners || [];
                 const fancyMarketUpdate = { ...fancyMarket, serviceId, runners: runnerUpdate, topic: marketPubKey, updatedAt } as FancyMarket;
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(fancyMarketUpdate));
                 const marketPubUpdate = changedRunners?.length > 0 ? { ...fancyMarketUpdate, runners: changedRunners } : fancyMarketUpdate;
