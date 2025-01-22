@@ -66,7 +66,7 @@ export class FancyUpdateService {
             const settledRunners = this.getSettledRunners(changedRunners);
 
             if (settledRunners.length > 0) {
-                console.log("Settled fancy runners:", JSON.stringify(settledRunners, null, 2));
+                console.log("Settled fancy market runners:", JSON.stringify(settledRunners, null, 2));
 
                 await Promise.all(
                     settledRunners.map(runner =>
@@ -105,7 +105,7 @@ export class FancyUpdateService {
         if (!existingFancyMarket?.runners?.length) return fancyMarket.runners;
 
         return fancyMarket.runners.filter(runner => {
-            const existingRunner = existingFancyMarket.runners.find(r => r.selectionId == runner.selectionId);
+            const existingRunner = existingFancyMarket.runners.find(r => Number(r.selectionId) == Number(runner.selectionId));
             return !isEqual(existingRunner, runner);
         });
     }
@@ -125,12 +125,11 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
-
         const runnerUpdate = fancyMarket.runners
             ? [
                 ...fancyMarket.runners,
                 ...(existingFancyMarket?.runners?.filter(existingRunner =>
-                    !fancyMarket.runners.some(fancyRunner => fancyRunner.selectionId == existingRunner.selectionId)
+                    !fancyMarket.runners.some(fancyRunner => Number(fancyRunner.selectionId) == Number(existingRunner.selectionId))
                 ) || []),
             ]
             : existingFancyMarket?.runners || [];
