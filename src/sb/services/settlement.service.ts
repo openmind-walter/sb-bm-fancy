@@ -197,14 +197,14 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             }
             else {
                 const penndingFancyBets = (respose?.result || []) as PendingBet[];
-                this.logger.info(`Check fancy Settlement : ${penndingFancyBets?.length}`, SettlementService.name);
+                // this.logger.info(`Check fancy Settlement : ${penndingFancyBets?.length}`, SettlementService.name);
                 if (penndingFancyBets?.length == 0) return;
                 const marketOutComes = await this.getMarketOutCome();
                 if (marketOutComes?.length == 0) return;
 
                 for (let i = 0; i < penndingFancyBets?.length; i++) {
                     const bet = penndingFancyBets[i];
-                    const marketOutCome = marketOutComes.find(m => m.event_id == Number(bet.EVENT_ID) && m.market_id == bet.SELECTION_ID)
+                    const marketOutCome = marketOutComes.find(m => m?.event_id == Number(bet?.EVENT_ID) && m?.market_id == bet?.SELECTION_ID)
                     if (marketOutCome) {
                         if (
                             (bet.SIDE == SIDE.BACK && marketOutCome.result && marketOutCome.result >= bet.PRICE) ||
