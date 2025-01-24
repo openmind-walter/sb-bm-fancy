@@ -189,7 +189,7 @@ export class SettlementService implements OnModuleInit {
     @Cron('0 */1 * * *')
     async checkFancyOutcome() {
         try {
-            const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending/${BettingType.FANCY}`))?.data;
+            const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending/by_betting_type/${BettingType.FANCY}`))?.data;
 
             if (!respose?.result || respose?.status == "error") {
                 this.logger.error(`Error on get SB pennding  bets from DB on check settlement : ${respose?.status}`, SettlementService.name);
