@@ -204,7 +204,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
 
                 for (let i = 0; i < penndingFancyBets?.length; i++) {
                     const bet = penndingFancyBets[i];
-                    const marketOutCome = marketOutComes.find(m => m.event_id == Number(bet.EVENT_ID) && `${m.market_id}` == bet.MARKET_ID)
+                    const marketOutCome = marketOutComes.find(m => m.event_id == Number(bet.EVENT_ID) && m.market_id == bet.SELECTION_ID)
                     if (marketOutCome) {
                         if (
                             (bet.SIDE == SIDE.BACK && marketOutCome.result && marketOutCome.result >= bet.PRICE) ||
