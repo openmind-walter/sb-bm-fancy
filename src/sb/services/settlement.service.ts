@@ -208,10 +208,10 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                     if (marketOutCome) {
                         const result = Number(marketOutCome.result);
                         const price = Number(bet.PRICE);
-                        if (marketOutCome.result && (
+                        if (
                             (bet.SIDE == SIDE.BACK && result >= price) ||
                             (bet.SIDE == SIDE.LAY && result < price))
-                        ) {
+                         {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
                         }
