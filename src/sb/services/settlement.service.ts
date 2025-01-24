@@ -11,7 +11,7 @@ import { Cron } from '@nestjs/schedule';
 import { CacheService } from 'src/cache/cache.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import configuration from 'src/configuration';
-
+import { MarketOutcome } from 'src/model/Marketoutcome';
 
 enum SettlementResult {
     'WON' = "WON",
@@ -29,6 +29,7 @@ export class SettlementService implements OnModuleInit {
     ) { }
     async onModuleInit() {
         await this.checkSettlementOfBet();
+        await this.checkFancyOutcome();
     }
 
 
@@ -142,12 +143,11 @@ export class SettlementService implements OnModuleInit {
 
     }
 
-    //  @Cron(`*/5 * * * *`)
+
     private async checkSettlementOfBet() {
 
         try {
             const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending`))?.data;
-
             if (!respose?.result || respose?.status == "error") {
                 this.logger.error(`Error on get SB pennding  bets from DB on check settlement : ${respose?.status}`, SettlementService.name);
             }
@@ -168,16 +168,57 @@ export class SettlementService implements OnModuleInit {
 
                     }
                     else if (bet.BETTING_TYPE == BettingType.FANCY) {
-                        const field = CachedKeys.getFancyHashField(bet.EVENT_ID, bet.SERVICE_ID, bet.PROVIDER_ID);
-                        const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
-                        const fancy = fancyMarketHash ? JSON.parse(fancyMarketHash) as FancyMarket : null;
-                        if (fancy) {
-                            const runner = fancy.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
-                            if (runner)
-                                await this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner, [penndingBets[i]])
+                        // const field = CachedKeys.getFancyHashField(bet.EVENT_ID, bet.SERVICE_ID, bet.PROVIDER_ID);
+                        // const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
+                        // const fancy = fancyMarketHash ? JSON.parse(fancyMarketHash) as FancyMarket : null;
+                        // if (fancy) {
+                        //     const runner = fancy.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
+                        //     if (runner)
+                        //         await this.fancyBetSettlement(fancy.marketId, fancy.providerId, runner, [penndingBets[i]])
+                        // }
+                        // else
+                        //     this.logger.error(`fancy maket not found from cache id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet?.MARKET_ID}`, SettlementService.name)
+                    }
+
+                }
+            }
+        } catch (error) {
+            this.logger.error(`Error on check settlement Of Bet : ${error.message}`, SettlementService.name);
+        }
+    }
+    @Cron('0 */1 * * *')
+    async checkFancyOutcome() {
+        try {
+            const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending/${BettingType.FANCY}`))?.data;
+
+            if (!respose?.result || respose?.status == "error") {
+                this.logger.error(`Error on get SB pennding  bets from DB on check settlement : ${respose?.status}`, SettlementService.name);
+            }
+            else {
+                const penndingFancyBets = (respose?.result || []) as PendingBet[];
+                this.logger.info(`Check fancy Settlement : ${penndingFancyBets?.length}`, SettlementService.name);
+                if (penndingFancyBets?.length == 0) return;
+                const marketOutComes = await this.getMarketOutCome();
+                if (marketOutComes?.length == 0) return;
+
+                for (let i = 0; i < penndingFancyBets?.length; i++) {
+                    const bet = penndingFancyBets[i];
+                    const marketOutCome = marketOutComes.find(m => m.event_id == Number(bet.EVENT_ID) && `${m.market_id}` == bet.MARKET_ID)
+                    if (marketOutCome) {
+                        if (
+                            (bet.SIDE == SIDE.BACK && marketOutCome.result && marketOutCome.result >= bet.PRICE) ||
+                            (bet.SIDE == SIDE.LAY && marketOutCome.result && marketOutCome.result < bet.PRICE)
+                        ) {
+                            this.logger.info(`on fancy bet settlement id: ${bet?.ID} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
+                            await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
+                        }
+                        else if (marketOutCome.result) {
+                            this.logger.info(`on fancy bet settlement id: ${bet?.ID} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.LOST}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
+                            await this.betSettlement(bet.BF_BET_ID, SettlementResult.LOST)
                         }
                         else
-                            this.logger.error(`fancy maket not found from cache id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet?.MARKET_ID}`, SettlementService.name)
+                            this.logger.error(`fancy market closed but got null result for bet event id ${bet?.EVENT_ID} from provider ,id ${bet?.ID} selection id ${bet?.SELECTION_ID}`, SettlementService.name)
+
                     }
 
                 }
@@ -186,6 +227,23 @@ export class SettlementService implements OnModuleInit {
 
         } catch (error) {
             this.logger.error(`Error on check settlement Of Bet : ${error.message}`, SettlementService.name);
+        }
+
+
+    }
+
+    async getMarketOutCome() {
+        try {
+
+            const outcomeResponse = (await axios.get(`${this.configService.get("PROVIDER_SB_ENDPOINT")}/get-latest-results`))?.data;
+            if (outcomeResponse?.status === 200)
+                return outcomeResponse?.data as MarketOutcome[];
+            else {
+                this.logger.error(`Error on  get  market outcome from provider SB : ${outcomeResponse}`, SettlementService.name);
+                return []
+            }
+        } catch (error) {
+            this.logger.error(`Error on  get  market outcome from provider SB: ${error.message}`, SettlementService.name);
         }
 
     }

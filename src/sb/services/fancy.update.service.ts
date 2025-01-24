@@ -7,7 +7,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from '../../model/fancy.market';
 import { isEqual } from 'lodash';
-import { SettlementService } from './settlement.service';
+// import { SettlementService } from './settlement.service';
 
 
 const { redisPubClientFE, dragonflyClient, sbHashKey } = configuration;
@@ -18,7 +18,7 @@ export class FancyUpdateService {
         private readonly cacheService: CacheService,
         private logger: LoggerService,
         private whiteLabelService: WhiteLabelService,
-        private settlementService: SettlementService
+        // private settlementService: SettlementService
     ) { }
 
     @Process()
@@ -63,21 +63,21 @@ export class FancyUpdateService {
 
             const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket);
 
-            const settledRunners = this.getSettledRunners(changedRunners);
+            // const settledRunners = this.getSettledRunners(changedRunners);
 
-            if (settledRunners.length > 0) {
-                console.log("Settled fancy market runners:", JSON.stringify(settledRunners, null, 2));
+            // if (settledRunners.length > 0) {
+            //     console.log("Settled fancy market runners:", JSON.stringify(settledRunners, null, 2));
 
-                await Promise.all(
-                    settledRunners.map(runner =>
-                        this.settlementService.fancyBetSettlement(
-                            fancyMarket.marketId,
-                            fancyMarket.providerId,
-                            runner
-                        )
-                    )
-                );
-            }
+            //     await Promise.all(
+            //         settledRunners.map(runner =>
+            //             this.settlementService.fancyBetSettlement(
+            //                 fancyMarket.marketId,
+            //                 fancyMarket.providerId,
+            //                 runner
+            //             )
+            //         )
+            //     );
+            // }
 
             if (!fancyMarketHash || changedRunners.length > 0) {
                 const updatedFancyMarket = this.mergeFancyMarkets(
