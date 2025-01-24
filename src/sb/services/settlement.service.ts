@@ -118,7 +118,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                 this.logger.error(`Error on  bet settlement: ${respose?.status}`, SettlementService.name);
             }
             else
-                this.logger.info(`update bet Settlement  bf_ bet id: ${BF_BET_ID}  `, SettlementService.name);
+                this.logger.info(` bet Settlement updated  for bf_bet id: ${BF_BET_ID}  `, SettlementService.name);
         } catch (error) {
             this.logger.error(`Error on  bet settlement: ${error.message}`, SettlementService.name);
         }
@@ -206,20 +206,19 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                     const bet = penndingFancyBets[i];
                     const marketOutCome = marketOutComes.find(m => m?.event_id == Number(bet?.EVENT_ID) && m?.market_id == bet?.SELECTION_ID)
                     if (marketOutCome) {
-                        if (
-                            (bet.SIDE == SIDE.BACK && marketOutCome.result && marketOutCome.result >= bet.PRICE) ||
-                            (bet.SIDE == SIDE.LAY && marketOutCome.result && marketOutCome.result < bet.PRICE)
+                        const result = Number(marketOutCome.result);
+                        const price = Number(bet.PRICE);
+                        if (marketOutCome.result && (
+                            (bet.SIDE == SIDE.BACK && result >= price) ||
+                            (bet.SIDE == SIDE.LAY && result < price))
                         ) {
-                            this.logger.info(`on fancy bet settlement id: ${bet?.ID} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
+                            this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
                         }
-                        else if (marketOutCome.result) {
-                            this.logger.info(`on fancy bet settlement id: ${bet?.ID} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.LOST}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
+                        else {
+                            this.logger.info(`on fancy bet settlement id: ${bet?.ID} ,side: ${bet?.SIDE}, price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.LOST}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.LOST)
                         }
-                        else
-                            this.logger.error(`fancy market closed but got null result for bet event id ${bet?.EVENT_ID} from provider ,id ${bet?.ID} selection id ${bet?.SELECTION_ID}`, SettlementService.name)
-
                     }
 
                 }
@@ -227,7 +226,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             }
 
         } catch (error) {
-            this.logger.error(`Error on check settlement Of Bet : ${error.message}`, SettlementService.name);
+            this.logger.error(`Error on check fancy settlement Of Bet : ${error.message}`, SettlementService.name);
         }
 
 
