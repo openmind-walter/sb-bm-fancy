@@ -9,12 +9,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getSanitizedRedisUrl } from 'src/utlities';
 import { SBUpdateService } from './services/sb.update.service';
 import { SettlementService } from './services/settlement.service';
-import { ScheduleModule } from '@nestjs/schedule';
+
 
 @Module({
     imports: [
         CacheModule,
-        ScheduleModule.forRoot(),
         BullModule.forRootAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({

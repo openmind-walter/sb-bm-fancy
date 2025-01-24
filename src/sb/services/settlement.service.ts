@@ -1,13 +1,12 @@
 
-import { Injectable, OnModuleInit, } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit, } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { LoggerService } from 'src/common/logger.service';
 import { BettingType, SIDE } from 'src/model';
 import { BookmakerMarket, BookmakerRunner, BookmakerRunnerStaus, BookmakerStaus } from 'src/model/bookmaker';
-import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from 'src/model/fancy.market';
+import { FancyMarketRunner, FancyRunnerStaus } from 'src/model/fancy.market';
 import { PendingBet } from 'src/model/penndigBet';
-import { Cron } from '@nestjs/schedule';
 import { CacheService } from 'src/cache/cache.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import configuration from 'src/configuration';
@@ -20,8 +19,8 @@ enum SettlementResult {
 
 const { dragonflyClient, sbHashKey } = configuration;
 @Injectable()
-export class SettlementService implements OnModuleInit {
-
+export class SettlementService implements OnModuleInit, OnModuleDestroy {
+    private fancyOutComeUpdateInterval: NodeJS.Timeout;
     constructor(
         private configService: ConfigService,
         private logger: LoggerService,
@@ -29,7 +28,10 @@ export class SettlementService implements OnModuleInit {
     ) { }
     async onModuleInit() {
         await this.checkSettlementOfBet();
-        await this.checkFancyOutcome();
+        this.fancyOutComeUpdateInterval = setInterval(() => this.checkFancyOutcome(), 60000);
+    }
+    onModuleDestroy() {
+        clearInterval(this.fancyOutComeUpdateInterval);
     }
 
 
@@ -61,9 +63,6 @@ export class SettlementService implements OnModuleInit {
             this.logger.error(`Error on  check fancy bet settlement: ${error.message}`, SettlementService.name);
         }
     }
-
-
-
 
 
     async bookMakerBetSettlement(marketId: string, providerId, runner: BookmakerRunner, bookmakerStatus: BookmakerStaus, pendingPlaceBets?: PendingBet[]) {
@@ -186,7 +185,9 @@ export class SettlementService implements OnModuleInit {
             this.logger.error(`Error on check settlement Of Bet : ${error.message}`, SettlementService.name);
         }
     }
-    @Cron('0 */1 * * *')
+
+
+
     async checkFancyOutcome() {
         try {
             const respose = (await axios.get(`${process.env.API_SERVER_URL}/v1/api/sb_placebet/pending/by_betting_type/${BettingType.FANCY}`))?.data;
