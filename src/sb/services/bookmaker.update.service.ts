@@ -80,7 +80,8 @@ export class BookMakerUpdateService {
             const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
             const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) : null;
             if (bookMaker) {
-                delete bookMaker.topic;
+                delete bookMaker?.topic;
+                delete bookMaker?.updatedAt;
             }
             if (bookMaker && !isEqual(bookMaker, newBookMaker)) {
                 changed = true;
@@ -98,8 +99,8 @@ export class BookMakerUpdateService {
                     JSON.stringify(filteredBookMaker)
                 );
 
-                const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER   || runner.status == BookmakerRunnerStaus.REMOVED);
-                await Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId , newBookMaker.providerId, runner, (newBookMaker.status))))
+                const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER || runner.status == BookmakerRunnerStaus.REMOVED);
+                await Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId, newBookMaker.providerId, runner, (newBookMaker.status))))
             }
 
         } catch (error) {
