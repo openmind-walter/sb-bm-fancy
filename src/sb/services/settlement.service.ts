@@ -22,7 +22,7 @@ const { dragonflyClient, sbHashKey } = configuration;
 @Injectable()
 export class SettlementService implements OnModuleInit, OnModuleDestroy {
     private fancyOutComeUpdateInterval: NodeJS.Timeout;
-    private bookMakerOutComeUpdateInterval: NodeJS.Timeout;
+    // private bookMakerOutComeUpdateInterval: NodeJS.Timeout;
 
     constructor(
         private configService: ConfigService,
@@ -32,11 +32,11 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
     async onModuleInit() {
         await this.checkBookMakerSettlement();
         this.fancyOutComeUpdateInterval = setInterval(() => this.checkFancyOutcome(), 60000);
-        this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 55000);
+        // this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 55000);
     }
     onModuleDestroy() {
         clearInterval(this.fancyOutComeUpdateInterval);
-        clearInterval(this.bookMakerOutComeUpdateInterval);
+        // clearInterval(this.bookMakerOutComeUpdateInterval);
     }
 
 

@@ -6,10 +6,12 @@ import { CachedKeys } from 'src/common/cachedKeys';
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { isEqual } from 'lodash';
-import { BookmakerMarket, BookmakerRunnerStaus, BookMakersUpdate } from 'src/model/bookmaker';
+import { BookmakerMarket, BookmakerRunner, BookmakerRunnerStaus, BookMakersUpdate } from 'src/model/bookmaker';
 import { SettlementService } from './settlement.service';
 
 const { redisPubClientFE, sbHashKey, dragonflyClient } = configuration;
+
+
 
 @Processor('bookMakerUpdate')
 export class BookMakerUpdateService {
@@ -20,7 +22,6 @@ export class BookMakerUpdateService {
         private whiteLabelService: WhiteLabelService,
         private settlementService: SettlementService
     ) {
-
     }
 
 
@@ -72,49 +73,86 @@ export class BookMakerUpdateService {
 
     private async updateBookMakerMarketHash(newBookMaker: BookmakerMarket, wl: number) {
         try {
-            if (!newBookMaker) return;
+
             const serviceId = `${wl}-${newBookMaker.serviceId}`;
-            let changed = false;
             const field = CachedKeys.getBookMakerHashField(newBookMaker.eventId, serviceId, newBookMaker.providerId);
+            const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId, wl, newBookMaker.serviceId, newBookMaker.providerId);
 
             const bookMakerMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
-            const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) : null;
-            if (bookMaker) {
-                delete bookMaker?.topic;
-                delete bookMaker?.updatedAt;
-            }
-            if (bookMaker && !isEqual(bookMaker, newBookMaker)) {
-                changed = true;
-            }
+            const existingBookMakerMarket: BookmakerMarket | null = bookMakerMarketHash
+                ? (JSON.parse(bookMakerMarketHash) as BookmakerMarket)
+                : null;
+            const hasOtherMarketChanges = this.hasMarketChanges(existingBookMakerMarket, newBookMaker);
+            const changedRunners = this.getChangedRunners(existingBookMakerMarket, newBookMaker);
 
-            if (!bookMakerMarketHash || changed) {
-                const updatedAt = (new Date()).toISOString();
-                const marketPubKey = CachedKeys.getBookMakerPub(newBookMaker.marketId, wl, newBookMaker.serviceId, newBookMaker.providerId);
-                const bookMakerMarketUpdate = { ...newBookMaker, serviceId, topic: marketPubKey, updatedAt } as BookmakerMarket;
-                await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(bookMakerMarketUpdate));
-                const filteredBookMaker = this.filterOutSettledMarket(bookMakerMarketUpdate)
+            if (!bookMakerMarketHash || changedRunners.length > 0 || hasOtherMarketChanges) {
+                const updatedBookMakerMarket = this.mergeBookMakerMarkets(
+                    newBookMaker,
+                    serviceId,
+                    marketPubKey
+                );
+                await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedBookMakerMarket));
                 await this.cacheService.publish(
                     redisPubClientFE,
                     marketPubKey,
-                    JSON.stringify(filteredBookMaker)
+                    JSON.stringify({
+                        ...updatedBookMakerMarket,
+                        runners: this.filterOutSettledRunners(changedRunners.length > 0 ? changedRunners : updatedBookMakerMarket.runners)
+                    })
                 );
 
-                // const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER || runner.status == BookmakerRunnerStaus.REMOVED);
-                // await Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId, newBookMaker.providerId, runner, (newBookMaker.status))))
+                if (changedRunners.length > 0) {
+                    const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER || runner.status == BookmakerRunnerStaus.REMOVED);
+                    Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId,
+                        newBookMaker.providerId, runner, (newBookMaker.status)))).catch(err => this.logger.error("Settlement error:", err));
+                }
+
             }
 
         } catch (error) {
             this.logger.error(`updateBookMakerMarketHash: ${error.message}`, BookMakerUpdateService.name);
-            return newBookMaker;
+            return null;
         }
     }
 
-    private filterOutSettledMarket(bookmaker: BookmakerMarket) {
-        const runners = bookmaker?.runners.map(runner => {
+
+    private hasMarketChanges(existingBookMakerMarket: BookmakerMarket | null, newBookMaker: BookmakerMarket): boolean {
+        if (!existingBookMakerMarket) return true;
+
+        const ignoreKeys = ['runners', 'topic', 'updatedAt'];
+        const relevantKeys = Object.keys(newBookMaker).filter(key => !ignoreKeys.includes(key));
+
+        return relevantKeys.some(key => !isEqual(existingBookMakerMarket[key], newBookMaker[key]));
+    }
+    private getChangedRunners(existingBookMakerMarket: BookmakerMarket | null, newBookMaker: BookmakerMarket): BookmakerRunner[] {
+        if (!existingBookMakerMarket?.runners?.length) return newBookMaker.runners;
+
+        return newBookMaker.runners.filter(runner => {
+            const existingRunner = existingBookMakerMarket.runners.find(r => Number(r.selectionId) === Number(runner.selectionId));
+            return !isEqual(existingRunner, runner);
+        });
+    }
+
+    private mergeBookMakerMarkets(
+        newBookMaker: BookmakerMarket,
+        serviceId: string,
+        marketPubKey: string
+    ): BookmakerMarket {
+        const updatedAt = new Date().toISOString();
+        return {
+            ...newBookMaker,
+            serviceId,
+            topic: marketPubKey,
+            updatedAt
+        };
+    }
+
+    private filterOutSettledRunners(bookmakeRunners: BookmakerRunner[]): BookmakerRunner[] {
+        return bookmakeRunners.map(runner => {
             return (runner?.status == BookmakerRunnerStaus.LOSER || runner?.status == BookmakerRunnerStaus.WINNER) ?
                 { ...runner, status: BookmakerRunnerStaus.CLOSED } : runner
         });
-        return { ...bookmaker, runners };
+
     }
 
 }
