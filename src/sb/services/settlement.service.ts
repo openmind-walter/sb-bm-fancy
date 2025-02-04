@@ -106,7 +106,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             break;
 
                         case runner.status == BookmakerRunnerStaus.LOSER:
-                            const resultLose = side === SIDE.LAY ? SettlementResult.WON : SettlementResult.LOST;
+                            const resultLose = side == SIDE.LAY ? SettlementResult.WON : SettlementResult.LOST;
                             this.logger.info(
                                 `on bookmaker bet settlement: ID=${betId}, Side=${side}, Result=${resultLose}, Event=${eventId}, Selection=${selectionId}`,
                                 SettlementService.name
