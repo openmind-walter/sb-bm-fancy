@@ -119,7 +119,7 @@ export class BookMakerUpdateService {
     private hasMarketChanges(existingBookMakerMarket: BookmakerMarket | null, newBookMaker: BookmakerMarket): boolean {
         if (!existingBookMakerMarket) return true;
 
-        const ignoreKeys = ['runners', 'topic', 'updatedAt'];
+        const ignoreKeys = ['runners', 'topic', 'updatedAt','serviceId'];
         const relevantKeys = Object.keys(newBookMaker).filter(key => !ignoreKeys.includes(key));
 
         return relevantKeys.some(key => !isEqual(existingBookMakerMarket[key], newBookMaker[key]));
