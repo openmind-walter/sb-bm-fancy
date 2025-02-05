@@ -24,7 +24,6 @@ export class SBUpdateService implements OnModuleInit {
         try {
             const { dragonflySubClient, bookMakerSubKey } = configuration;
             this.cacheService.subscribe(dragonflySubClient, bookMakerSubKey, async (message) => {
-                console.log("---")
 
                 await this.bookMakerUpdate.add({message})
             })

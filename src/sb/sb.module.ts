@@ -8,6 +8,8 @@ import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getSanitizedRedisUrl } from 'src/utlities';
 import { SBUpdateService } from './services/sb.update.service';
+import { SettlementService } from './services/settlement.service';
+
 
 @Module({
     imports: [
@@ -15,7 +17,7 @@ import { SBUpdateService } from './services/sb.update.service';
         BullModule.forRootAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
-                url: getSanitizedRedisUrl(configService.get<string>('DRAGONFLY_URL')),
+                url: getSanitizedRedisUrl(configService.get<string>('REDIS_BE_URL')),
                 limiter: {
                     max: 1000,
                     duration: 60000,
@@ -46,7 +48,8 @@ import { SBUpdateService } from './services/sb.update.service';
         WhiteLabelService,
         BookMakerUpdateService,
         FancyUpdateService,
-        SBUpdateService
+        SBUpdateService,
+        SettlementService
     ],
 })
 export class SbModule { }

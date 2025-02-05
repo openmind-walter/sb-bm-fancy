@@ -12,20 +12,25 @@ export class CacheService implements OnModuleDestroy {
     this.initializeClient(configuration.dragonflyPubClient, process.env.DRAGONFLY_URL);
     this.initializeClient(configuration.dragonflySubClient, process.env.DRAGONFLY_URL);
     this.initializeClient(configuration.redisPubClientFE, process.env.REDIS_FE_URL);
-    this.initializeClient(configuration.redisPubClientFE, process.env.REDIS_FE_URL);
   }
 
   private initializeClient(clientName: string, url: string) {
     try {
       const client = new Redis(url);
       client.on('error', (err) => {
-        console.error(`Cache client ${clientName} URL:${url} encountered an error:`, err);
+        this.shutdownServer(`Cache client ${clientName} URL:${url} encountered    message: ${err}`);
       });
       this.clients[clientName] = client;
     } catch (err) {
-      console.error(`Failed to initialize Cache client ${clientName} URL:${url}`, err);
+      this.shutdownServer(`Failed to initialize Cache client ${clientName} URL:${url}   message:  ${err}`);
     }
   }
+
+  private shutdownServer(message?: string) {
+    console.error(`Shutting down server due  error... ${message}`);
+    process.exit(1); // Ensure graceful shutdown
+  }
+
 
   async get(client: string, key: string): Promise<string | null> {
     const redis = this.getClient(client);
@@ -91,6 +96,15 @@ export class CacheService implements OnModuleDestroy {
   async hGet(client: string, key: string, field: string): Promise<string | null> {
     const redis = this.getClient(client);
     return redis ? await redis.hget(key, field) : null;
+  }
+
+  async hDel(client: string, key: string, field: string): Promise<boolean> {
+    const redis = this.getClient(client);
+    if (redis) {
+      const result = await redis.hdel(key, field);
+      return result > 0; // hdel returns the number of fields removed, if any
+    }
+    return false;
   }
 
   async onModuleDestroy() {
