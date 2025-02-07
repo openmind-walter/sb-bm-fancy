@@ -7,6 +7,7 @@ trigger:
       - "dev"
       - "uat"
       - "prod"
+      - "sit"
 pr:
   branches:
     exclude:
@@ -41,6 +42,25 @@ steps:
       - task: ECRPushImage@1
         inputs:
           awsCredentials: "uat-aws"
+          regionName: "eu-west-1"
+          imageSource: "imagename"
+          sourceImageName: "$(REPOSITORY_NAME)"
+          sourceImageTag: "latest"
+          repositoryName: "$(REPOSITORY_NAME)"
+          pushTag: latest
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/sit') }}:
+      - task: ECRPushImage@1
+        inputs:
+          awsCredentials: "sit-aws"
+          regionName: "eu-west-1"
+          imageSource: "imagename"
+          sourceImageName: "$(REPOSITORY_NAME)"
+          sourceImageTag: "latest"
+          repositoryName: "$(REPOSITORY_NAME)"
+          pushTag: $(Build.SourceBranchName)-$(SHORT_COMMIT)-$(Build.BuildId)
+      - task: ECRPushImage@1
+        inputs:
+          awsCredentials: "sit-aws"
           regionName: "eu-west-1"
           imageSource: "imagename"
           sourceImageName: "$(REPOSITORY_NAME)"
