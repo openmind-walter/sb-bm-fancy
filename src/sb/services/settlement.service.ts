@@ -11,6 +11,7 @@ import { CacheService } from 'src/cache/cache.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import configuration from 'src/configuration';
 import { MarketOutcome } from 'src/model/Marketoutcome';
+import { EventResult } from 'src/model/eventResult';
 
 enum SettlementResult {
     'WON' = "WON",
@@ -39,7 +40,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
         // clearInterval(this.bookMakerOutComeUpdateInterval);
     }
 
-// Unused code, will called  on facny  market closed
+    // Unused code, will be called in the future need when the fancy market is closed or voided.
     async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner, pendingPlaceBets?: PendingBet[]) {
         try {
             if (!(runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED))
@@ -231,7 +232,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.VOIDED}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betVoided(bet.ID)
                         } else if (
-                            (bet.SIDE == SIDE.BACK && price >= result ) ||
+                            (bet.SIDE == SIDE.BACK && price >= result) ||
                             (bet.SIDE == SIDE.LAY && price < result)) {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
@@ -265,6 +266,22 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             }
         } catch (error) {
             this.logger.error(`Error on  get  market outcome from provider SB: ${error.message}`, SettlementService.name);
+        }
+
+    }
+
+    async saveSettlementResult(EVENT_ID: string, MARKET_ID: string, SELECTION_ID: number, PROVIDER_ID, RESULT: string) {
+
+        try {
+            const closed_time = new Date().toISOString();
+            const eventResult = new EventResult(EVENT_ID, MARKET_ID, SELECTION_ID, PROVIDER_ID, 'SB', closed_time, RESULT)
+            const url = `${process.env.API_SERVER_URL}/v1/api/events_result`;
+            const response = await axios.post(url, eventResult)
+            if (response?.data.status != 'ok') {
+                this.logger.error(`Error on  saveSettlementResult: ${response?.data} ,${JSON.stringify(eventResult)}`, SettlementService.name);
+            }
+        } catch (error) {
+            this.logger.error(`Error on  saveSettlementResult: ${error}`, SettlementService.name);
         }
 
     }
