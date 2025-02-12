@@ -39,7 +39,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
         // clearInterval(this.bookMakerOutComeUpdateInterval);
     }
 
-
+// Unused code, will called  on facny  market closed
     async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner, pendingPlaceBets?: PendingBet[]) {
         try {
             if (!(runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED))
@@ -231,8 +231,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.VOIDED}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betVoided(bet.ID)
                         } else if (
-                            (bet.SIDE == SIDE.BACK && result >= price) ||
-                            (bet.SIDE == SIDE.LAY && result < price)) {
+                            (bet.SIDE == SIDE.BACK && price >= result ) ||
+                            (bet.SIDE == SIDE.LAY && price < result)) {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
                         }
