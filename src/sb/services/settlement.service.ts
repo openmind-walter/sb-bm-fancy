@@ -53,8 +53,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                     await this.betVoided(penndingBets[i].ID);
                 } else {
                     if (
-                        (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && runner?.priceResult >= penndingBets[i].PRICE) ||
-                        (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
+                        (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && penndingBets[i].PRICE >= runner?.priceResult) ||
+                        (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && penndingBets[i].PRICE < runner?.priceResult)
                     )
                         await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WON)
                     else if (runner?.priceResult)
