@@ -125,24 +125,30 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
-
-        const runnerUpdate = existingFancyMarket?.runners
-            ? existingFancyMarket.runners.filter(existingRunner =>
-                fancyMarket.runners?.some(fancyRunner =>
-                    Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
-                )
+    
+        // Keep only the runners that exist in fancyMarket
+        const existingRunners = existingFancyMarket?.runners?.filter(existingRunner =>
+            fancyMarket.runners?.some(fancyRunner => 
+                Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
             )
-            : [];
-
+        ) || [];
+    
+        // Add new runners from fancyMarket that are not in existingFancyMarket
+        const newRunners = fancyMarket.runners?.filter(fancyRunner =>
+            !existingFancyMarket?.runners?.some(existingRunner => 
+                Number(existingRunner.selectionId) == Number(fancyRunner.selectionId)
+            )
+        ) || [];
+    
         return {
             ...fancyMarket,
             serviceId,
-            runners: runnerUpdate.length > 0 ? runnerUpdate : fancyMarket.runners || [],
+            runners: [...existingRunners, ...newRunners], 
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
     }
-
+    
 
 }
 
