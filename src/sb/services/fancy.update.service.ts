@@ -125,19 +125,19 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
-        const runnerUpdate = fancyMarket.runners
-            ? [
-                ...fancyMarket.runners,
-                ...(existingFancyMarket?.runners?.filter(existingRunner =>
-                    !fancyMarket.runners.some(fancyRunner => Number(fancyRunner.selectionId) == Number(existingRunner.selectionId))
-                ) || []),
-            ]
-            : existingFancyMarket?.runners || [];
+
+        const runnerUpdate = existingFancyMarket?.runners
+            ? existingFancyMarket.runners.filter(existingRunner =>
+                fancyMarket.runners?.some(fancyRunner =>
+                    Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
+                )
+            )
+            : [];
 
         return {
             ...fancyMarket,
             serviceId,
-            runners: runnerUpdate,
+            runners: runnerUpdate.length > 0 ? runnerUpdate : fancyMarket.runners || [],
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
