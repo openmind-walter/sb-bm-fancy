@@ -11,6 +11,7 @@ import { CacheService } from 'src/cache/cache.service';
 import { CachedKeys } from 'src/common/cachedKeys';
 import configuration from 'src/configuration';
 import { MarketOutcome } from 'src/model/Marketoutcome';
+import { EventResult } from 'src/model/eventResult';
 
 enum SettlementResult {
     'WON' = "WON",
@@ -22,24 +23,30 @@ const { dragonflyClient, sbHashKey } = configuration;
 @Injectable()
 export class SettlementService implements OnModuleInit, OnModuleDestroy {
     private fancyOutComeUpdateInterval: NodeJS.Timeout;
-    // private bookMakerOutComeUpdateInterval: NodeJS.Timeout;
+    private bookMakerOutComeUpdateInterval: NodeJS.Timeout;
 
     constructor(
         private configService: ConfigService,
         private logger: LoggerService,
         private readonly cacheService: CacheService,
+
     ) { }
     async onModuleInit() {
+        await this.checkSettlement();
+    }
+
+    async checkSettlement() {
+        await this.checkBookMakerSettlement();
         await this.checkBookMakerSettlement();
         this.fancyOutComeUpdateInterval = setInterval(() => this.checkFancyOutcome(), 60000);
-        // this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 55000);
+        this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 65100);
     }
     onModuleDestroy() {
         clearInterval(this.fancyOutComeUpdateInterval);
-        // clearInterval(this.bookMakerOutComeUpdateInterval);
+        clearInterval(this.bookMakerOutComeUpdateInterval);
     }
 
-
+    // Unused code, will be called in the future need when the fancy market is closed or voided.
     async fancyBetSettlement(marketId: string, providerId, runner: FancyMarketRunner, pendingPlaceBets?: PendingBet[]) {
         try {
             if (!(runner?.status == FancyRunnerStaus.CLOSED || runner?.priceResult || runner.status == FancyRunnerStaus.REMOVED))
@@ -53,8 +60,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                     await this.betVoided(penndingBets[i].ID);
                 } else {
                     if (
-                        (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && runner?.priceResult >= penndingBets[i].PRICE) ||
-                        (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
+                        (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && penndingBets[i].PRICE >= runner?.priceResult) ||
+                        (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && penndingBets[i].PRICE < runner?.priceResult)
                     )
                         await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WON)
                     else if (runner?.priceResult)
@@ -120,6 +127,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                                 SettlementService.name
                             );
                     }
+                    await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, runner);
                 } catch (error) {
                     this.logger.error(`Error processing bet ID=${betId}: ${error}`, SettlementService.name);
                 }
@@ -231,8 +239,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.VOIDED}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betVoided(bet.ID)
                         } else if (
-                            (bet.SIDE == SIDE.BACK && result >= price) ||
-                            (bet.SIDE == SIDE.LAY && result < price)) {
+                            (bet.SIDE == SIDE.BACK && price >= result) ||
+                            (bet.SIDE == SIDE.LAY && price < result)) {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
                         }
@@ -240,6 +248,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID} ,side: ${bet?.SIDE}, price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.LOST}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.LOST)
                         }
+                        await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, marketOutCome);
                     }
 
                 }
@@ -265,6 +274,22 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             }
         } catch (error) {
             this.logger.error(`Error on  get  market outcome from provider SB: ${error.message}`, SettlementService.name);
+        }
+
+    }
+
+    async saveSettlementResult(EVENT_ID: string, MARKET_ID: string, SELECTION_ID: number, PROVIDER_ID, RESULT: any) {
+
+        try {
+            const closed_time = new Date().toISOString();
+            const eventResult = new EventResult(EVENT_ID, MARKET_ID, SELECTION_ID, PROVIDER_ID, 'SB', closed_time, RESULT)
+            const url = `${process.env.API_SERVER_URL}/v1/api/events_result`;
+            const response = await axios.post(url, eventResult)
+            if (response?.data.status != 'ok') {
+                this.logger.error(`Error on  saveSettlementResult: ${response?.data} ,${JSON.stringify(eventResult)}`, SettlementService.name);
+            }
+        } catch (error) {
+            this.logger.error(`Error on  saveSettlementResult: ${error}`, SettlementService.name);
         }
 
     }
