@@ -4,7 +4,7 @@ export class EventResult {
     PROVIDER_ID: string;
     PROVIDER: String;
     CLOSED_TIME: string;
-    RESULT: string;
+    RESULT: any;
     SELECTION_ID: number;
 
     constructor(
@@ -14,7 +14,7 @@ export class EventResult {
         PROVIDER_ID: string,
         PROVIDER: string,
         CLOSED_TIME: string,
-        RESULT: string,
+        RESULT: any,
 
     ) {
         this.EVENT_ID = EVENT_ID;

@@ -23,21 +23,27 @@ const { dragonflyClient, sbHashKey } = configuration;
 @Injectable()
 export class SettlementService implements OnModuleInit, OnModuleDestroy {
     private fancyOutComeUpdateInterval: NodeJS.Timeout;
-    // private bookMakerOutComeUpdateInterval: NodeJS.Timeout;
+    private bookMakerOutComeUpdateInterval: NodeJS.Timeout;
 
     constructor(
         private configService: ConfigService,
         private logger: LoggerService,
         private readonly cacheService: CacheService,
+
     ) { }
     async onModuleInit() {
+        await this.checkSettlement();
+    }
+
+    async checkSettlement() {
+        await this.checkBookMakerSettlement();
         await this.checkBookMakerSettlement();
         this.fancyOutComeUpdateInterval = setInterval(() => this.checkFancyOutcome(), 60000);
-        // this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 55000);
+        this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 65100);
     }
     onModuleDestroy() {
         clearInterval(this.fancyOutComeUpdateInterval);
-        // clearInterval(this.bookMakerOutComeUpdateInterval);
+        clearInterval(this.bookMakerOutComeUpdateInterval);
     }
 
     // Unused code, will be called in the future need when the fancy market is closed or voided.
@@ -121,6 +127,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                                 SettlementService.name
                             );
                     }
+                    await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, runner);
                 } catch (error) {
                     this.logger.error(`Error processing bet ID=${betId}: ${error}`, SettlementService.name);
                 }
@@ -241,6 +248,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID} ,side: ${bet?.SIDE}, price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.LOST}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.LOST)
                         }
+                        await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, marketOutCome);
                     }
 
                 }
@@ -270,7 +278,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
 
     }
 
-    async saveSettlementResult(EVENT_ID: string, MARKET_ID: string, SELECTION_ID: number, PROVIDER_ID, RESULT: string) {
+    async saveSettlementResult(EVENT_ID: string, MARKET_ID: string, SELECTION_ID: number, PROVIDER_ID, RESULT: any) {
 
         try {
             const closed_time = new Date().toISOString();
