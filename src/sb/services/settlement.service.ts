@@ -60,8 +60,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                     await this.betVoided(penndingBets[i].ID);
                 } else {
                     if (
-                        (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && penndingBets[i].PRICE >= runner?.priceResult) ||
-                        (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && penndingBets[i].PRICE < runner?.priceResult)
+                        (penndingBets[i].SIDE == SIDE.BACK && runner?.priceResult && runner?.priceResult >= penndingBets[i].PRICE) ||
+                        (penndingBets[i].SIDE == SIDE.LAY && runner?.priceResult && runner?.priceResult < penndingBets[i].PRICE)
                     )
                         await this.betSettlement(penndingBets[i].BF_BET_ID, SettlementResult.WON)
                     else if (runner?.priceResult)
@@ -100,7 +100,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                                 `on bookmaker bet settlementvoided: ID=${betId}, Side=${side}, Event=${eventId}, Selection=${selectionId}`,
                                 SettlementService.name
                             );
-                            await this.betVoided(betId);
+                             await this.betVoided(betId);
                             break;
 
                         case runner.status == BookmakerRunnerStaus.WINNER:
@@ -239,8 +239,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.VOIDED}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betVoided(bet.ID)
                         } else if (
-                            (bet.SIDE == SIDE.BACK && price >= result) ||
-                            (bet.SIDE == SIDE.LAY && price < result)) {
+                            (bet.SIDE == SIDE.BACK && result >= price) ||
+                            (bet.SIDE == SIDE.LAY && result < price)) {
                             this.logger.info(`on fancy bet settlement id: ${bet?.ID}, side: ${bet?.SIDE} ,price: ${bet?.PRICE} , outcome result : ${marketOutCome.result} ,result ${SettlementResult.WON}, event id ${bet?.EVENT_ID} ,selection id ${bet?.SELECTION_ID} `, SettlementService.name)
                             await this.betSettlement(bet.BF_BET_ID, SettlementResult.WON)
                         }
