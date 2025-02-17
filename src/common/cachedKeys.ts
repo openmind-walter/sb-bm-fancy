@@ -7,6 +7,10 @@ export class CachedKeys {
     return `sb_fancy_${eventId}_${serviceId}_${providerId}`;
   }
 
+  static getFancyStoreHashField(eventId, serviceId, providerId) {
+    return `sb_fancy_store_${eventId}_${serviceId}_${providerId}`;
+  }
+
   static getBookMakerHashField(eventId, serviceId, providerId) {
     return `sb_BM_${eventId}_${serviceId}_${providerId}`;
   }

@@ -7,8 +7,6 @@ import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from '../../model/fancy.market';
 import { isEqual } from 'lodash';
-// import { SettlementService } from './settlement.service';
-
 
 const { redisPubClientFE, dragonflyClient, sbHashKey } = configuration;
 @Processor('fancyUpdate')
@@ -17,8 +15,7 @@ export class FancyUpdateService {
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
-        private whiteLabelService: WhiteLabelService,
-        // private settlementService: SettlementService
+        private whiteLabelService: WhiteLabelService
     ) { }
 
     @Process()
@@ -54,6 +51,7 @@ export class FancyUpdateService {
         try {
             const serviceId = `${wl}-${fancyMarket.serviceId}`;
             const field = CachedKeys.getFancyHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
+            const fieldStore = CachedKeys.getFancyStoreHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
             const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
 
             const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
@@ -61,23 +59,8 @@ export class FancyUpdateService {
                 ? (JSON.parse(fancyMarketHash) as FancyMarket)
                 : null;
 
-            const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket);
+            const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket) || [];
 
-            // const settledRunners = this.getSettledRunners(changedRunners);
-
-            // if (settledRunners.length > 0) {
-            //     console.log("Settled fancy market runners:", JSON.stringify(settledRunners, null, 2));
-
-            //     await Promise.all(
-            //         settledRunners.map(runner =>
-            //             this.settlementService.fancyBetSettlement(
-            //                 fancyMarket.marketId,
-            //                 fancyMarket.providerId,
-            //                 runner
-            //             )
-            //         )
-            //     );
-            // }
 
             if (!fancyMarketHash || changedRunners.length > 0) {
                 const updatedFancyMarket = this.mergeFancyMarkets(
@@ -87,11 +70,25 @@ export class FancyUpdateService {
                     marketPubKey
                 );
 
+                const updatedStoreFancyMarket = this.mergeFancyStoreMarkets(
+                    fancyMarket,
+                    existingFancyMarket,
+                    serviceId,
+                    marketPubKey
+                );
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedFancyMarket));
+                await this.cacheService.hset(dragonflyClient, sbHashKey, fieldStore, JSON.stringify(updatedStoreFancyMarket));
+                const nonExistingRunners = (existingFancyMarket?.runners ?? []).filter(existingRunner =>
+                    !(fancyMarket.runners ?? []).some(fancyRunner =>
+                        Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
+                    )
+                ).map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
+
+
                 await this.cacheService.publish(
                     redisPubClientFE,
                     marketPubKey,
-                    JSON.stringify({ ...updatedFancyMarket, runners: changedRunners.length > 0 ? changedRunners : updatedFancyMarket.runners })
+                    JSON.stringify({ ...updatedFancyMarket, runners: changedRunners.length > 0 ? [...changedRunners, ...nonExistingRunners] : updatedFancyMarket.runners })
                 );
             }
 
@@ -125,30 +122,58 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
-    
+
         // Keep only the runners that exist in fancyMarket
         const existingRunners = existingFancyMarket?.runners?.filter(existingRunner =>
-            fancyMarket.runners?.some(fancyRunner => 
+            fancyMarket.runners?.some(fancyRunner =>
                 Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
             )
         ) || [];
-    
+
+
+
         // Add new runners from fancyMarket that are not in existingFancyMarket
         const newRunners = fancyMarket.runners?.filter(fancyRunner =>
-            !existingFancyMarket?.runners?.some(existingRunner => 
+            !existingFancyMarket?.runners?.some(existingRunner =>
                 Number(existingRunner.selectionId) == Number(fancyRunner.selectionId)
             )
         ) || [];
-    
+
         return {
             ...fancyMarket,
             serviceId,
-            runners: [...existingRunners, ...newRunners], 
+            runners: [...existingRunners, ...newRunners],
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
     }
-    
+
+
+    private mergeFancyStoreMarkets(
+        fancyMarket: FancyMarket,
+        existingFancyMarket: FancyMarket | null,
+        serviceId: string,
+        marketPubKey: string
+    ): FancyMarket {
+        const updatedAt = new Date().toISOString();
+        const runnerUpdate = fancyMarket.runners
+            ? [
+                ...fancyMarket.runners,
+                ...(existingFancyMarket?.runners?.filter(existingRunner =>
+                    !fancyMarket.runners.some(fancyRunner => Number(fancyRunner.selectionId) == Number(existingRunner.selectionId))
+                ) || []),
+            ]
+            : existingFancyMarket?.runners || [];
+
+        return {
+            ...fancyMarket,
+            serviceId,
+            runners: runnerUpdate,
+            topic: marketPubKey,
+            updatedAt,
+        } as FancyMarket;
+    }
+
 
 }
 
