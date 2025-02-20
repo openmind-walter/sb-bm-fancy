@@ -37,7 +37,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
 
     async checkSettlement() {
         await this.checkBookMakerSettlement();
-        await this.checkBookMakerSettlement();
+        await this.checkFancyOutcome();
         this.fancyOutComeUpdateInterval = setInterval(() => this.checkFancyOutcome(), 60000);
         this.bookMakerOutComeUpdateInterval = setInterval(() => this.checkBookMakerSettlement(), 65100);
     }
@@ -100,7 +100,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                                 `on bookmaker bet settlementvoided: ID=${betId}, Side=${side}, Event=${eventId}, Selection=${selectionId}`,
                                 SettlementService.name
                             );
-                             await this.betVoided(betId);
+                            await this.betVoided(betId);
                             break;
 
                         case runner.status == BookmakerRunnerStaus.WINNER:
@@ -205,8 +205,22 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                         const runner = bookMaker.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                         if (runner)
                             await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [bet])
-                    } else
-                        this.logger.error(`bookMaker maket not found from cache id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+                        else
+                            this.logger.error(`bookMaker market runner not found from cache  id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+                    } else {
+                        const sbBookmakeMarket = await this.getBookmakerMarketFromSB(bet.EVENT_ID, bet.PROVIDER_ID);
+                        if (!sbBookmakeMarket)
+                            this.logger.error(`bookMaker market not found from cache and SB id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+                        else {
+                            const runner = sbBookmakeMarket.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
+                            if (runner)
+                                await this.bookMakerBetSettlement(sbBookmakeMarket.marketId, sbBookmakeMarket.providerId, runner, sbBookmakeMarket.status, [bet])
+                            else
+                                this.logger.error(`bookMaker market  runner not found from  SB id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+
+                        }
+                    }
+
                 }
             }
         } catch (error) {
@@ -292,6 +306,17 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             this.logger.error(`Error on  saveSettlementResult: ${error}`, SettlementService.name);
         }
 
+    }
+
+    async getBookmakerMarketFromSB(eventId, providerId) {
+        try {
+
+            const bmResponse = (await axios.get(`${this.configService.get("SB_REST_SERVER_URL")}/sb/bm/event-bookmaker/${eventId}/${providerId}`))?.data;
+            return (bmResponse?.data ? bmResponse?.data : null) as BookmakerMarket;
+
+        } catch (error) {
+            this.logger.error(`Error on getBookmakerMarketFromSB : ${error}`, SettlementService.name);
+        }
     }
 
 }
