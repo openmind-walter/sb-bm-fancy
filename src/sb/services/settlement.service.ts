@@ -206,17 +206,17 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                         if (runner)
                             await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [bet])
                         else
-                            this.logger.error(`bookMaker market runner not found from cache  id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+                            this.logger.error(`bookMaker market runner not found from cache  id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID} , provider id ${bet?.PROVIDER_ID}`, SettlementService.name);
                     } else {
                         const sbBookmakeMarket = await this.getBookmakerMarketFromSB(bet.EVENT_ID, bet.PROVIDER_ID);
                         if (!sbBookmakeMarket)
-                            this.logger.error(`bookMaker market not found from cache and SB id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+                            this.logger.error(`bookMaker market not found from cache and SB id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID} , provider id ${bet?.PROVIDER_ID}`, SettlementService.name);
                         else {
                             const runner = sbBookmakeMarket.runners.find(runner => runner.selectionId == bet.SELECTION_ID)
                             if (runner)
                                 await this.bookMakerBetSettlement(sbBookmakeMarket.marketId, sbBookmakeMarket.providerId, runner, sbBookmakeMarket.status, [bet])
                             else
-                                this.logger.error(`bookMaker market  runner not found from  SB id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID}`, SettlementService.name);
+                                this.logger.error(`bookMaker market  runner not found from  SB id: ${bet?.ID}, event id : ${bet?.EVENT_ID} , selection id: ${bet?.SELECTION_ID} , market id ${bet.MARKET_ID},  provider id ${bet?.PROVIDER_ID}`, SettlementService.name);
 
                         }
                     }
@@ -311,7 +311,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
     async getBookmakerMarketFromSB(eventId, providerId) {
         try {
 
-            const bmResponse = (await axios.get(`${this.configService.get("SB_REST_SERVER_URL")}/sb/bm/event-bookmaker/${eventId}/${providerId}?source=SB`))?.data;
+            const bmResponse = (await axios.get(`${this.configService.get("SB_REST_SERVER_URL")}/sb/bm/event-bookmaker/${eventId}/${providerId}`))?.data;
             return (bmResponse?.data ? bmResponse?.data : null) as BookmakerMarket;
 
         } catch (error) {
