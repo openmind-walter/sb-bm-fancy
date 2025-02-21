@@ -311,7 +311,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
     async getBookmakerMarketFromSB(eventId, providerId) {
         try {
 
-            const bmResponse = (await axios.get(`${this.configService.get("SB_REST_SERVER_URL")}/sb/bm/event-bookmaker/${eventId}/${providerId}`))?.data;
+            const bmResponse = (await axios.get(`${this.configService.get("SB_REST_SERVER_URL")}/sb/bm/event-bookmaker/${eventId}/${providerId}?source=SB`))?.data;
             return (bmResponse?.data ? bmResponse?.data : null) as BookmakerMarket;
 
         } catch (error) {
