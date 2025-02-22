@@ -55,8 +55,13 @@ export class FancyUpdateService {
             const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
 
             const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
+            const fancyMarketCahedHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, fieldStore);
             const existingFancyMarket: FancyMarket | null = fancyMarketHash
                 ? (JSON.parse(fancyMarketHash) as FancyMarket)
+                : null;
+
+            const cahedFancyMarket: FancyMarket | null = fancyMarketCahedHash
+                ? (JSON.parse(fancyMarketCahedHash) as FancyMarket)
                 : null;
 
             const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket) || [];
@@ -71,7 +76,7 @@ export class FancyUpdateService {
                 );
 
                 const updatedStoreFancyMarket = this.mergeFancyStoreMarkets(
-                    fancyMarket,
+                    cahedFancyMarket,
                     existingFancyMarket,
                     serviceId,
                     marketPubKey
