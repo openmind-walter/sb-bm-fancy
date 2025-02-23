@@ -83,7 +83,7 @@ export class FancyUpdateService {
                 );
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedFancyMarket));
                 await this.cacheService.hset(dragonflyClient, sbHashKey, fieldStore, JSON.stringify(updatedStoreFancyMarket));
-                
+
                 const nonExistingRunners = (existingFancyMarket?.runners ?? [])
                     .filter(existingRunner =>
                         !(fancyMarket?.runners ?? []).some(fancyRunner =>
@@ -106,10 +106,10 @@ export class FancyUpdateService {
     }
 
     private getChangedRunners(existingFancyMarket: FancyMarket | null, fancyMarket: FancyMarket): FancyMarketRunner[] {
-        if (!existingFancyMarket?.runners?.length) return fancyMarket.runners;
+        if (!existingFancyMarket?.runners?.length) return fancyMarket.runners ?? [];
 
-        return fancyMarket.runners.filter(runner => {
-            const existingRunner = existingFancyMarket.runners.find(r => Number(r.selectionId) == Number(runner.selectionId));
+        return (fancyMarket.runners ?? []).filter(runner => {
+            const existingRunner = (existingFancyMarket.runners ?? []).find(r => Number(r.selectionId) == Number(runner.selectionId));
             return !isEqual(existingRunner, runner);
         });
     }
@@ -166,7 +166,7 @@ export class FancyUpdateService {
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
 
-        const fancyRunners = fancyMarket.runners ?? [];
+        const fancyRunners = fancyMarket?.runners ?? [];
         const existingRunners = existingFancyMarket?.runners ?? [];
 
         const runnerUpdate = [
