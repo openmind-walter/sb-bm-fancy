@@ -127,10 +127,12 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
+        const fancyRunners = fancyMarket?.runners ?? [];
+        const existingRunners = existingFancyMarket?.runners ?? [];
 
         // Keep only the runners that exist in fancyMarket
-        const existingRunners = existingFancyMarket?.runners?.filter(existingRunner =>
-            fancyMarket.runners?.some(fancyRunner =>
+        const runnerUpdate = existingRunners?.filter(existingRunner =>
+            fancyRunners?.some(fancyRunner =>
                 Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
             )
         ) || [];
@@ -138,8 +140,8 @@ export class FancyUpdateService {
 
 
         // Add new runners from fancyMarket that are not in existingFancyMarket
-        const newRunners = fancyMarket.runners?.filter(fancyRunner =>
-            !existingFancyMarket?.runners?.some(existingRunner =>
+        const newRunners = fancyRunners?.filter(fancyRunner =>
+            !existingRunners?.some(existingRunner =>
                 Number(existingRunner.selectionId) == Number(fancyRunner.selectionId)
             )
         ) || [];
@@ -147,7 +149,7 @@ export class FancyUpdateService {
         return {
             ...fancyMarket,
             serviceId,
-            runners: [...existingRunners, ...newRunners],
+            runners: [...runnerUpdate, ...newRunners],
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
@@ -161,14 +163,18 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
-        const runnerUpdate = fancyMarket.runners
-            ? [
-                ...fancyMarket.runners,
-                ...(existingFancyMarket?.runners?.filter(existingRunner =>
-                    !fancyMarket.runners.some(fancyRunner => Number(fancyRunner.selectionId) == Number(existingRunner.selectionId))
-                ) || []),
-            ]
-            : existingFancyMarket?.runners || [];
+
+        const fancyRunners = fancyMarket.runners ?? [];
+        const existingRunners = existingFancyMarket?.runners ?? [];
+
+        const runnerUpdate = [
+            ...fancyRunners,
+            ...existingRunners.filter(existingRunner =>
+                !fancyRunners.some(fancyRunner =>
+                    Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
+                )
+            ),
+        ];
 
         return {
             ...fancyMarket,
