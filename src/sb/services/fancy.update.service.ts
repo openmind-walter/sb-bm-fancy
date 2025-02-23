@@ -83,14 +83,15 @@ export class FancyUpdateService {
                 );
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedFancyMarket));
                 await this.cacheService.hset(dragonflyClient, sbHashKey, fieldStore, JSON.stringify(updatedStoreFancyMarket));
+                
                 const nonExistingRunners = (existingFancyMarket?.runners ?? [])
-                .filter(existingRunner =>
-                    (fancyMarket?.runners ?? []).some(fancyRunner =>
-                        Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
-                    ) == false 
-                )
-                .map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
-            
+                    .filter(existingRunner =>
+                        !(fancyMarket?.runners ?? []).some(fancyRunner =>
+                            Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
+                        )
+                    )
+                    .map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
+
                 await this.cacheService.publish(
                     redisPubClientFE,
                     marketPubKey,
