@@ -67,7 +67,7 @@ export class FancyUpdateService {
             const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket) || [];
 
 
-            if (!fancyMarketHash || changedRunners.length > 0) {
+            if (!fancyMarketHash || changedRunners.length > 0 || !fancyMarketCahedHash) {
                 const updatedFancyMarket = this.mergeFancyMarkets(
                     fancyMarket,
                     existingFancyMarket,
