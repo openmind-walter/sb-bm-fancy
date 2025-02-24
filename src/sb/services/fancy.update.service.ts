@@ -26,7 +26,6 @@ export class FancyUpdateService {
             if (!fancyMarkets?.length) return;
             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
 
-            for (let i = 0; i < wls.length; i++) {
                 await Promise.all(
                     fancyMarkets.map(async (market) => {
                         for (let i = 0; i < wls.length; i++) {
@@ -38,7 +37,7 @@ export class FancyUpdateService {
                         }
                     })
                 );
-            }
+    
         } catch (error) {
             this.logger.error(`processFancyMarketUpdates: ${error.message}`, FancyUpdateService.name);
         }
@@ -67,7 +66,7 @@ export class FancyUpdateService {
             const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket) || [];
 
 
-            if (!fancyMarketHash || changedRunners.length > 0) {
+            if (!fancyMarketHash || changedRunners.length > 0 || !fancyMarketCahedHash) {
                 const updatedFancyMarket = this.mergeFancyMarkets(
                     fancyMarket,
                     existingFancyMarket,
@@ -76,8 +75,8 @@ export class FancyUpdateService {
                 );
 
                 const updatedStoreFancyMarket = this.mergeFancyStoreMarkets(
+                    fancyMarket,
                     cahedFancyMarket,
-                    existingFancyMarket,
                     serviceId,
                     marketPubKey
                 );
