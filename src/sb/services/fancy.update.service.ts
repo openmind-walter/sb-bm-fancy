@@ -55,8 +55,13 @@ export class FancyUpdateService {
             const marketPubKey = CachedKeys.getFancyPub(fancyMarket.marketId, wl, fancyMarket.serviceId, fancyMarket.providerId);
 
             const fancyMarketHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, field);
+            const fancyMarketCahedHash = await this.cacheService.hGet(dragonflyClient, sbHashKey, fieldStore);
             const existingFancyMarket: FancyMarket | null = fancyMarketHash
                 ? (JSON.parse(fancyMarketHash) as FancyMarket)
+                : null;
+
+            const cahedFancyMarket: FancyMarket | null = fancyMarketCahedHash
+                ? (JSON.parse(fancyMarketCahedHash) as FancyMarket)
                 : null;
 
             const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket) || [];
@@ -71,19 +76,21 @@ export class FancyUpdateService {
                 );
 
                 const updatedStoreFancyMarket = this.mergeFancyStoreMarkets(
-                    fancyMarket,
+                    cahedFancyMarket,
                     existingFancyMarket,
                     serviceId,
                     marketPubKey
                 );
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedFancyMarket));
                 await this.cacheService.hset(dragonflyClient, sbHashKey, fieldStore, JSON.stringify(updatedStoreFancyMarket));
-                const nonExistingRunners = (existingFancyMarket?.runners ?? []).filter(existingRunner =>
-                    !(fancyMarket.runners ?? []).some(fancyRunner =>
-                        Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
-                    )
-                ).map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
 
+                const nonExistingRunners = (existingFancyMarket?.runners ?? [])
+                    .filter(existingRunner =>
+                        !(fancyMarket?.runners ?? []).some(fancyRunner =>
+                            Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
+                        )
+                    )
+                    .map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
 
                 await this.cacheService.publish(
                     redisPubClientFE,
@@ -99,10 +106,10 @@ export class FancyUpdateService {
     }
 
     private getChangedRunners(existingFancyMarket: FancyMarket | null, fancyMarket: FancyMarket): FancyMarketRunner[] {
-        if (!existingFancyMarket?.runners?.length) return fancyMarket.runners;
+        if (!existingFancyMarket?.runners?.length) return fancyMarket.runners ?? [];
 
-        return fancyMarket.runners.filter(runner => {
-            const existingRunner = existingFancyMarket.runners.find(r => Number(r.selectionId) == Number(runner.selectionId));
+        return (fancyMarket.runners ?? []).filter(runner => {
+            const existingRunner = (existingFancyMarket.runners ?? []).find(r => Number(r.selectionId) == Number(runner.selectionId));
             return !isEqual(existingRunner, runner);
         });
     }
@@ -122,10 +129,12 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
+        const fancyRunners = fancyMarket?.runners ?? [];
+        const existingRunners = existingFancyMarket?.runners ?? [];
 
         // Keep only the runners that exist in fancyMarket
-        const existingRunners = existingFancyMarket?.runners?.filter(existingRunner =>
-            fancyMarket.runners?.some(fancyRunner =>
+        const runnerUpdate = existingRunners?.filter(existingRunner =>
+            fancyRunners?.some(fancyRunner =>
                 Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
             )
         ) || [];
@@ -133,8 +142,8 @@ export class FancyUpdateService {
 
 
         // Add new runners from fancyMarket that are not in existingFancyMarket
-        const newRunners = fancyMarket.runners?.filter(fancyRunner =>
-            !existingFancyMarket?.runners?.some(existingRunner =>
+        const newRunners = fancyRunners?.filter(fancyRunner =>
+            !existingRunners?.some(existingRunner =>
                 Number(existingRunner.selectionId) == Number(fancyRunner.selectionId)
             )
         ) || [];
@@ -142,7 +151,7 @@ export class FancyUpdateService {
         return {
             ...fancyMarket,
             serviceId,
-            runners: [...existingRunners, ...newRunners],
+            runners: [...runnerUpdate, ...newRunners],
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
@@ -156,14 +165,18 @@ export class FancyUpdateService {
         marketPubKey: string
     ): FancyMarket {
         const updatedAt = new Date().toISOString();
-        const runnerUpdate = fancyMarket.runners
-            ? [
-                ...fancyMarket.runners,
-                ...(existingFancyMarket?.runners?.filter(existingRunner =>
-                    !fancyMarket.runners.some(fancyRunner => Number(fancyRunner.selectionId) == Number(existingRunner.selectionId))
-                ) || []),
-            ]
-            : existingFancyMarket?.runners || [];
+
+        const fancyRunners = fancyMarket?.runners ?? [];
+        const existingRunners = existingFancyMarket?.runners ?? [];
+
+        const runnerUpdate = [
+            ...fancyRunners,
+            ...existingRunners.filter(existingRunner =>
+                !fancyRunners.some(fancyRunner =>
+                    Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
+                )
+            ),
+        ];
 
         return {
             ...fancyMarket,
