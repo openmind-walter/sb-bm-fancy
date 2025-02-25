@@ -130,31 +130,22 @@ export class FancyUpdateService {
         const updatedAt = new Date().toISOString();
         const fancyRunners = fancyMarket?.runners ?? [];
         const existingRunners = existingFancyMarket?.runners ?? [];
-
-        // Keep only the runners that exist in fancyMarket
-        const runnerUpdate = existingRunners?.filter(existingRunner =>
-            fancyRunners?.some(fancyRunner =>
-                Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
-            )
-        ) || [];
-
-
-
-        // Add new runners from fancyMarket that are not in existingFancyMarket
-        const newRunners = fancyRunners?.filter(fancyRunner =>
-            !existingRunners?.some(existingRunner =>
-                Number(existingRunner.selectionId) == Number(fancyRunner.selectionId)
-            )
-        ) || [];
-
+    
+        const runnerUpdate = fancyRunners.map(fancyRunner => {
+            const existingRunner = existingRunners.find(existingRunner =>
+                Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
+            );
+            return existingRunner ? { ...existingRunner, ...fancyRunner } : fancyRunner;
+        });
+    
         return {
             ...fancyMarket,
             serviceId,
-            runners: [...runnerUpdate, ...newRunners],
+            runners: runnerUpdate, 
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
-    }
+    }  
 
 
     private mergeFancyStoreMarkets(
