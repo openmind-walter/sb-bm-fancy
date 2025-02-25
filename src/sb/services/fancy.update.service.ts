@@ -26,18 +26,18 @@ export class FancyUpdateService {
             if (!fancyMarkets?.length) return;
             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
 
-                await Promise.all(
-                    fancyMarkets.map(async (market) => {
-                        for (let i = 0; i < wls.length; i++) {
-                            if (market.runners?.length > 0) {
-                                await this.updateFancyMarketHash(market, wls[i])
-
-                            }
+            await Promise.all(
+                fancyMarkets.map(async (market) => {
+                    for (let i = 0; i < wls.length; i++) {
+                        if (market.runners?.length > 0) {
+                            await this.updateFancyMarketHash(market, wls[i])
 
                         }
-                    })
-                );
-    
+
+                    }
+                })
+            );
+
         } catch (error) {
             this.logger.error(`processFancyMarketUpdates: ${error.message}`, FancyUpdateService.name);
         }
@@ -131,21 +131,20 @@ export class FancyUpdateService {
         const fancyRunners = fancyMarket?.runners ?? [];
         const existingRunners = existingFancyMarket?.runners ?? [];
 
-        // Keep only the runners that exist in fancyMarket
-        const runnerUpdate = existingRunners?.filter(existingRunner =>
-            fancyRunners?.some(fancyRunner =>
-                Number(fancyRunner.selectionId) == Number(existingRunner.selectionId)
-            )
-        ) || [];
 
-
+        const runnerUpdate = fancyRunners.map(fancyRunner => {
+            const existingRunner = existingRunners.find(existingRunner =>
+                Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
+            );
+            return existingRunner ? { ...existingRunner, ...fancyRunner } : fancyRunner;
+        });
 
         // Add new runners from fancyMarket that are not in existingFancyMarket
-        const newRunners = fancyRunners?.filter(fancyRunner =>
-            !existingRunners?.some(existingRunner =>
-                Number(existingRunner.selectionId) == Number(fancyRunner.selectionId)
+        const newRunners = fancyRunners.filter(fancyRunner =>
+            !existingRunners.some(existingRunner =>
+                Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
             )
-        ) || [];
+        );
 
         return {
             ...fancyMarket,
@@ -155,7 +154,7 @@ export class FancyUpdateService {
             updatedAt,
         } as FancyMarket;
     }
-
+    
 
     private mergeFancyStoreMarkets(
         fancyMarket: FancyMarket,
