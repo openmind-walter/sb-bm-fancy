@@ -26,18 +26,18 @@ export class FancyUpdateService {
             if (!fancyMarkets?.length) return;
             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
 
-            await Promise.all(
-                fancyMarkets.map(async (market) => {
-                    for (let i = 0; i < wls.length; i++) {
-                        if (market.runners?.length > 0) {
-                            await this.updateFancyMarketHash(market, wls[i])
+                await Promise.all(
+                    fancyMarkets.map(async (market) => {
+                        for (let i = 0; i < wls.length; i++) {
+                            if (market.runners?.length > 0) {
+                                await this.updateFancyMarketHash(market, wls[i])
+
+                            }
 
                         }
-
-                    }
-                })
-            );
-
+                    })
+                );
+    
         } catch (error) {
             this.logger.error(`processFancyMarketUpdates: ${error.message}`, FancyUpdateService.name);
         }
@@ -130,31 +130,23 @@ export class FancyUpdateService {
         const updatedAt = new Date().toISOString();
         const fancyRunners = fancyMarket?.runners ?? [];
         const existingRunners = existingFancyMarket?.runners ?? [];
-
-
+    
         const runnerUpdate = fancyRunners.map(fancyRunner => {
             const existingRunner = existingRunners.find(existingRunner =>
                 Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
             );
             return existingRunner ? { ...existingRunner, ...fancyRunner } : fancyRunner;
         });
-
-        // Add new runners from fancyMarket that are not in existingFancyMarket
-        const newRunners = fancyRunners.filter(fancyRunner =>
-            !existingRunners.some(existingRunner =>
-                Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
-            )
-        );
-
+    
         return {
             ...fancyMarket,
             serviceId,
-            runners: [...runnerUpdate, ...newRunners],
+            runners: runnerUpdate, 
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
-    }
-    
+    }  
+
 
     private mergeFancyStoreMarkets(
         fancyMarket: FancyMarket,
