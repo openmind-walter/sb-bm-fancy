@@ -7,6 +7,7 @@ import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { FancyMarket, FancyMarketRunner, FancyRunnerStaus } from '../../model/fancy.market';
 import { isEqual } from 'lodash';
+import { BmFancyConfigService } from './bm.fancy.config.service';
 
 const { redisPubClientFE, dragonflyClient, sbHashKey } = configuration;
 @Processor('fancyUpdate')
@@ -15,7 +16,8 @@ export class FancyUpdateService {
     constructor(
         private readonly cacheService: CacheService,
         private logger: LoggerService,
-        private whiteLabelService: WhiteLabelService
+        private whiteLabelService: WhiteLabelService,
+        private bmFacnyConfigService: BmFancyConfigService
     ) { }
 
     @Process()
@@ -26,18 +28,19 @@ export class FancyUpdateService {
             if (!fancyMarkets?.length) return;
             const wls = this.whiteLabelService.getActiveWhiteLabelsId();
 
-                await Promise.all(
-                    fancyMarkets.map(async (market) => {
-                        for (let i = 0; i < wls.length; i++) {
-                            if (market.runners?.length > 0) {
-                                await this.updateFancyMarketHash(market, wls[i])
-
-                            }
+            await Promise.all(
+                fancyMarkets.map(async (market) => {
+                    for (let i = 0; i < wls.length; i++) {
+                        if (market.runners?.length > 0) {
+                            const  updatedMarket=this.bmFacnyConfigService.upateMinMaxBetSizeFacyMarket(market);
+                            await this.updateFancyMarketHash( updatedMarket, wls[i])
 
                         }
-                    })
-                );
-    
+
+                    }
+                })
+            );
+
         } catch (error) {
             this.logger.error(`processFancyMarketUpdates: ${error.message}`, FancyUpdateService.name);
         }
@@ -48,6 +51,7 @@ export class FancyUpdateService {
 
     private async updateFancyMarketHash(fancyMarket: FancyMarket, wl: number): Promise<FancyMarket | null> {
         try {
+        
             const serviceId = `${wl}-${fancyMarket.serviceId}`;
             const field = CachedKeys.getFancyHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
             const fieldStore = CachedKeys.getFancyStoreHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
@@ -130,22 +134,22 @@ export class FancyUpdateService {
         const updatedAt = new Date().toISOString();
         const fancyRunners = fancyMarket?.runners ?? [];
         const existingRunners = existingFancyMarket?.runners ?? [];
-    
+
         const runnerUpdate = fancyRunners.map(fancyRunner => {
             const existingRunner = existingRunners.find(existingRunner =>
                 Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
             );
             return existingRunner ? { ...existingRunner, ...fancyRunner } : fancyRunner;
         });
-    
+
         return {
             ...fancyMarket,
             serviceId,
-            runners: runnerUpdate, 
+            runners: runnerUpdate,
             topic: marketPubKey,
             updatedAt,
         } as FancyMarket;
-    }  
+    }
 
 
     private mergeFancyStoreMarkets(

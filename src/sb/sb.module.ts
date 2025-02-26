@@ -9,6 +9,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getSanitizedRedisUrl } from 'src/utlities';
 import { SBUpdateService } from './services/sb.update.service';
 import { SettlementService } from './services/settlement.service';
+import { BmFancyConfigService } from './services/bm.fancy.config.service';
 
 
 @Module({
@@ -49,7 +50,8 @@ import { SettlementService } from './services/settlement.service';
         BookMakerUpdateService,
         FancyUpdateService,
         SBUpdateService,
-        SettlementService
+        SettlementService,
+        BmFancyConfigService
     ],
 })
 export class SbModule { }
