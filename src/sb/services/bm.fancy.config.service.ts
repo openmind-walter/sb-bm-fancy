@@ -40,9 +40,9 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
       this.client.on('notification', async (msg) => {
         if (msg.channel === 'bookmaker_fancy_config_update') {
           const payloadObject = JSON.parse(msg?.payload) as BookmakerFancyConfigUpdate;
-          this.setMinMaxSize(payloadObject?.new_min_bet_size,payloadObject?.new_max_bet_size);
+          this.setMinMaxSize(payloadObject?.new_min_bet_size, payloadObject?.new_max_bet_size);
           this.logger.info(`bookmaker_fancy_config_update: ${JSON.stringify(payloadObject)}`, BmFancyConfigService.name);
-         }
+        }
 
       });
       await this.client.query('LISTEN bookmaker_fancy_config_update');
@@ -75,10 +75,13 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
   }
 
 
-  private setMinMaxSize(minBetSize, maxBetSize) {
-    this.minBetSize = Number(minBetSize) ? Math.ceil(Number(maxBetSize)) : this.minBetSize;
-    this.maxBetSize = Number(maxBetSize) ? Math.ceil(Number(maxBetSize)) : this.maxBetSize;
+  private setMinMaxSize(minBetSize: string | number, maxBetSize: string | number): void {
+    const parsedMinBetSize = Number(minBetSize);
+    const parsedMaxBetSize = Number(maxBetSize);
+    this.minBetSize = !isNaN(parsedMinBetSize) ? Math.ceil(parsedMinBetSize) : this.minBetSize;
+    this.maxBetSize = !isNaN(parsedMaxBetSize) ? Math.ceil(parsedMaxBetSize) : this.maxBetSize;
   }
+
 
   upateMinMaxBetSizeFacyMarket(market: FancyMarket) {
     const runners = market.runners.map(runner => (
@@ -88,9 +91,8 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
   }
 
 
-  updateMinMaxBetSizeBookmakerMarket(market:BookmakerMarket)
-  {
-    return {...market,minBet:this.minBetSize,maxBet:this.maxBetSize}
+  updateMinMaxBetSizeBookmakerMarket(market: BookmakerMarket) {
+    return { ...market, minBet: this.minBetSize, maxBet: this.maxBetSize }
   }
 
 
