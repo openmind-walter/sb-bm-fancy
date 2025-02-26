@@ -25,12 +25,11 @@ export enum BettingType {
 
 
 export interface BookmakerFancyConfigUpdate {
-  ID: number
-  OLD_MAX_BET_SIZE: number;
-  NEW_MAX_BET_SIZE: number;
-  OLD_MIN_BET_SIZE: number;
-  NEW_MIN_BET_SIZE: never;
-
+  id: number;
+  old_max_bet_size: number;
+  new_max_bet_size: number;
+  old_min_bet_size: number;
+  new_min_bet_size: number;
 }
 
 

@@ -32,8 +32,8 @@ export class FancyUpdateService {
                 fancyMarkets.map(async (market) => {
                     for (let i = 0; i < wls.length; i++) {
                         if (market.runners?.length > 0) {
-                            const  updatedMarket=this.bmFacnyConfigService.upateMinMaxBetSizeFacyMarket(market);
-                            await this.updateFancyMarketHash( updatedMarket, wls[i])
+                            const  configMarket=this.bmFacnyConfigService.upateMinMaxBetSizeFacyMarket(market);
+                            await this.updateFancyMarketHash( configMarket, wls[i])
 
                         }
 

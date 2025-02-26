@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Client } from 'pg';
 import { LoggerService } from 'src/common/logger.service';
 import { BookmakerFancyConfig, BookmakerFancyConfigUpdate } from 'src/model';
+import { BookmakerMarket } from 'src/model/bookmaker';
 import { FancyMarket } from 'src/model/fancy.market';
 
 
@@ -39,10 +40,9 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
       this.client.on('notification', async (msg) => {
         if (msg.channel === 'bookmaker_fancy_config_update') {
           const payloadObject = JSON.parse(msg?.payload) as BookmakerFancyConfigUpdate;
-
+          this.setMinMaxSize(payloadObject?.new_min_bet_size,payloadObject?.new_max_bet_size);
           this.logger.info(`bookmaker_fancy_config_update: ${JSON.stringify(payloadObject)}`, BmFancyConfigService.name);
-
-        }
+         }
 
       });
       await this.client.query('LISTEN bookmaker_fancy_config_update');
@@ -65,17 +65,20 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
       if (response.data?.result?.length > 0) {
         const config = response.data?.result[0] as BookmakerFancyConfig;
         this.logger.info(`getbookmakerFancyConfig ${JSON.stringify(config)} `, BmFancyConfigService.name);
-        this.minBetSize = config.MAX_BET_SIZE;
-        this.maxBetSize = config.MAX_BET_SIZE;
+        this.setMinMaxSize(config?.MIN_BET_SIZE, config?.MAX_BET_SIZE);
         this.logger.info(`bookmakerFancyConfig min  max value updated ${JSON.stringify(config)} `, BmFancyConfigService.name);
       }
     } catch (err) {
       this.logger.error(`getbookmakerFancyConfig: ${err.message}`, BmFancyConfigService.name);
-
     }
 
   }
 
+
+  private setMinMaxSize(minBetSize, maxBetSize) {
+    this.minBetSize = Number(minBetSize) ? Math.ceil(Number(maxBetSize)) : this.minBetSize;
+    this.maxBetSize = Number(maxBetSize) ? Math.ceil(Number(maxBetSize)) : this.maxBetSize;
+  }
 
   upateMinMaxBetSizeFacyMarket(market: FancyMarket) {
     const runners = market.runners.map(runner => (
@@ -85,9 +88,13 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
   }
 
 
+  updateMinMaxBetSizeBookmakerMarket(market:BookmakerMarket)
+  {
+    return {...market,minBet:this.minBetSize,maxBet:this.maxBetSize}
+  }
+
+
 }
-
-
 
 
 
