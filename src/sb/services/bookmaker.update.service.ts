@@ -8,6 +8,7 @@ import { Job } from 'bull';
 import { isEqual } from 'lodash';
 import { BookmakerMarket, BookmakerRunner, BookmakerRunnerStaus, BookMakersUpdate } from 'src/model/bookmaker';
 import { SettlementService } from './settlement.service';
+import { BmFancyConfigService } from './bm.fancy.config.service';
 
 const { redisPubClientFE, sbHashKey, dragonflyClient } = configuration;
 
@@ -20,7 +21,8 @@ export class BookMakerUpdateService {
         private readonly cacheService: CacheService,
         private logger: LoggerService,
         private whiteLabelService: WhiteLabelService,
-        private settlementService: SettlementService
+        private settlementService: SettlementService,
+        private bmFacnyConfigService: BmFancyConfigService
     ) {
     }
 
@@ -53,7 +55,10 @@ export class BookMakerUpdateService {
                                 // await this.whiteLabelService.filterWLBookmakers(wls[i], bookMakersUpdate.bookMakers);
 
                                 await Promise.all(
-                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) => this.updateBookMakerMarketHash(bookMaker, wls[i])));
+                                    wlbookmakers.map(async (bookMaker: BookmakerMarket) => {
+                                        const configMarket = this.bmFacnyConfigService.updateMinMaxBetSizeBookmakerMarket(bookMaker);
+                                        this.updateBookMakerMarketHash(configMarket, wls[i])
+                                    }));
                             }
                         } catch (error) {
                             this.logger.error(
@@ -119,7 +124,7 @@ export class BookMakerUpdateService {
     private hasMarketChanges(existingBookMakerMarket: BookmakerMarket | null, newBookMaker: BookmakerMarket): boolean {
         if (!existingBookMakerMarket) return true;
 
-        const ignoreKeys = ['runners', 'topic', 'updatedAt','serviceId'];
+        const ignoreKeys = ['runners', 'topic', 'updatedAt', 'serviceId', 'navIds'];
         const relevantKeys = Object.keys(newBookMaker).filter(key => !ignoreKeys.includes(key));
 
         return relevantKeys.some(key => !isEqual(existingBookMakerMarket[key], newBookMaker[key]));

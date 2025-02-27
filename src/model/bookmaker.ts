@@ -14,7 +14,8 @@ export interface BookmakerMarket {
     name: string;
     eventId: string;
     eventName?: string;
-    minBet: number;
+    minBet?: number,
+    maxBet?: number,
     isActive: number;
     betAllow: number;
     type: BookmakerType;
