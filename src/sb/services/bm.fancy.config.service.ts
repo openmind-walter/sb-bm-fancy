@@ -21,7 +21,7 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     await this.getbookmakerFancyConfig()
-    this.trackBMfacnyConfigChange()
+     this.trackBMfacnyConfigChange()
   }
 
   async onModuleDestroy() {
@@ -84,6 +84,7 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
 
 
   upateMinMaxBetSizeFacyMarket(market: FancyMarket) {
+    if (market?.runners?.length==0) return market;
     const runners = market.runners.map(runner => (
       { ...runner, minBetSize: this.minBetSize, maxBetSize: this.maxBetSize }
     ))
