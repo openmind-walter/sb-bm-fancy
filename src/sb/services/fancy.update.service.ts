@@ -26,16 +26,13 @@ export class FancyUpdateService {
             const { message } = job.data;
             const fancyMarkets = JSON.parse(message) as FancyMarket[]
             if (!fancyMarkets?.length) return;
-            const wls = this.whiteLabelService.getActiveWhiteLabelsId();
+            const wls =  this.whiteLabelService.getActiveWhiteLabelsId();
 
             await Promise.all(
                 fancyMarkets.map(async (market) => {
                     for (let i = 0; i < wls.length; i++) {
-                        if (market.runners?.length > 0) {
-                            const  configMarket=this.bmFacnyConfigService.upateMinMaxBetSizeFacyMarket(market);
-                            await this.updateFancyMarketHash( configMarket, wls[i])
-
-                        }
+                        const configMarket = this.bmFacnyConfigService.upateMinMaxBetSizeFacyMarket(market);
+                        await this.updateFancyMarketHash(configMarket, wls[i])
 
                     }
                 })
@@ -51,7 +48,8 @@ export class FancyUpdateService {
 
     private async updateFancyMarketHash(fancyMarket: FancyMarket, wl: number): Promise<FancyMarket | null> {
         try {
-        
+       
+
             const serviceId = `${wl}-${fancyMarket.serviceId}`;
             const field = CachedKeys.getFancyHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
             const fieldStore = CachedKeys.getFancyStoreHashField(fancyMarket.eventId, serviceId, fancyMarket.providerId);
@@ -68,9 +66,27 @@ export class FancyUpdateService {
                 : null;
 
             const changedRunners = this.getChangedRunners(existingFancyMarket, fancyMarket) || [];
+            const nonExistingRunners = (existingFancyMarket?.runners ?? [])
+                .filter(existingRunner =>
+                    !(fancyMarket?.runners ?? []).some(fancyRunner =>
+                        Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
+                    )
+                )
+                .map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
 
 
-            if (!fancyMarketHash || changedRunners.length > 0 || !fancyMarketCahedHash) {
+            if (!fancyMarketHash || changedRunners.length > 0  || nonExistingRunners.length > 0) {
+
+
+                if (fancyMarket?.runners?.length > 0) {
+                    const updatedStoreFancyMarket = this.mergeFancyStoreMarkets(
+                        fancyMarket,
+                        cahedFancyMarket,
+                        serviceId,
+                        marketPubKey
+                    );
+                     await this.cacheService.hset(dragonflyClient, sbHashKey, fieldStore, JSON.stringify(updatedStoreFancyMarket));
+                }
                 const updatedFancyMarket = this.mergeFancyMarkets(
                     fancyMarket,
                     existingFancyMarket,
@@ -78,22 +94,7 @@ export class FancyUpdateService {
                     marketPubKey
                 );
 
-                const updatedStoreFancyMarket = this.mergeFancyStoreMarkets(
-                    fancyMarket,
-                    cahedFancyMarket,
-                    serviceId,
-                    marketPubKey
-                );
                 await this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedFancyMarket));
-                await this.cacheService.hset(dragonflyClient, sbHashKey, fieldStore, JSON.stringify(updatedStoreFancyMarket));
-
-                const nonExistingRunners = (existingFancyMarket?.runners ?? [])
-                    .filter(existingRunner =>
-                        !(fancyMarket?.runners ?? []).some(fancyRunner =>
-                            Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
-                        )
-                    )
-                    .map(runner => ({ ...runner, status: FancyRunnerStaus.CLOSED }));
 
                 await this.cacheService.publish(
                     redisPubClientFE,
@@ -103,6 +104,7 @@ export class FancyUpdateService {
             }
 
         } catch (error) {
+
             this.logger.error(`update fancy market hash: ${error.message}`, FancyUpdateService.name);
             return null;
         }
@@ -112,7 +114,7 @@ export class FancyUpdateService {
         if (!existingFancyMarket?.runners?.length) return fancyMarket.runners ?? [];
 
         return (fancyMarket.runners ?? []).filter(runner => {
-            const existingRunner = (existingFancyMarket.runners ?? []).find(r => Number(r.selectionId) == Number(runner.selectionId));
+            const existingRunner = (existingFancyMarket?.runners ?? []).find(r => Number(r?.selectionId) == Number(runner?.selectionId));
             return !isEqual(existingRunner, runner);
         });
     }
@@ -137,7 +139,7 @@ export class FancyUpdateService {
 
         const runnerUpdate = fancyRunners.map(fancyRunner => {
             const existingRunner = existingRunners.find(existingRunner =>
-                Number(existingRunner.selectionId) === Number(fancyRunner.selectionId)
+                Number(existingRunner?.selectionId) === Number(fancyRunner?.selectionId)
             );
             return existingRunner ? { ...existingRunner, ...fancyRunner } : fancyRunner;
         });
@@ -167,7 +169,7 @@ export class FancyUpdateService {
             ...fancyRunners,
             ...existingRunners.filter(existingRunner =>
                 !fancyRunners.some(fancyRunner =>
-                    Number(fancyRunner.selectionId) === Number(existingRunner.selectionId)
+                    Number(fancyRunner?.selectionId) === Number(existingRunner?.selectionId)
                 )
             ),
         ];
