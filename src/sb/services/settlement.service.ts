@@ -32,7 +32,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
 
     ) { }
     async onModuleInit() {
-        // await this.checkSettlement();
+         await this.checkSettlement();
     }
 
     async checkSettlement() {
