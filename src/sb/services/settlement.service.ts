@@ -32,7 +32,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
 
     ) { }
     async onModuleInit() {
-        // await this.checkSettlement();
+           // await this.checkSettlement();
     }
 
     async checkSettlement() {
@@ -122,10 +122,13 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                             break;
 
                         default:
-                            this.logger.info(
-                                `Unhandled status for bet ID=${betId}`,
-                                SettlementService.name
-                            );
+                            {
+                                this.logger.info(
+                                    `Unhandled status for bet ID=${betId}`,
+                                    SettlementService.name
+                                );
+                                continue;
+                            }
                     }
                     await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, runner);
                 } catch (error) {
@@ -200,8 +203,8 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             const pendingBets = (response?.result || []) as PendingBet[];
             if (pendingBets.length === 0) return;
 
-            // Fetch market outcomes once to avoid redundant calls
-            const marketOutcomes = await this.getMarketOutCome();
+            // Fetch market outcomes once and filter for BM type
+            const marketOutcomes = (await this.getMarketOutCome()).filter(m => m.market_type == MarketOutComeType.BM);
 
             for (const bet of pendingBets) {
                 const field = CachedKeys.getBookMakerHashField(bet.EVENT_ID, bet.SERVICE_ID, bet.PROVIDER_ID);
@@ -209,39 +212,42 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                 const bookMaker = bookMakerMarketHash ? JSON.parse(bookMakerMarketHash) as BookmakerMarket : null;
 
                 if (bookMaker) {
-                    const runner = bookMaker.runners.find(r => r.selectionId == bet.SELECTION_ID);
-                    if (runner) {
-                        await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [bet]);
-                        this.logger.info(` on bookmaker bet settled successfully: Market ID: ${bookMaker.marketId}, Selection ID: ${bet.SELECTION_ID}, Result: ${bookMaker.status}`, SettlementService.name);
+                    if (bookMaker.status === BookmakerStaus.CLOSED || bookMaker.status === BookmakerStaus.REMOVED) {
+                        const runner = bookMaker.runners.find(r => r.selectionId == bet.SELECTION_ID);
+                        if (runner) {
+                            await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [bet]);
+                            continue;
+                        } else continue;
                     }
+                    continue;
                 }
+
                 // Handle market outcome if SB also doesn't have the market
-                const marketOutcome = marketOutcomes.find(m => m.event_id == Number(bet.EVENT_ID) && m.market_id?.toString() ==
-                    bet.PROVIDER_ID && m.market_type == MarketOutComeType.BM);
+                const marketOutcome = marketOutcomes.find(m => m.event_id == Number(bet.EVENT_ID) && m.market_id?.toString() == bet.PROVIDER_ID);
                 if (marketOutcome) {
                     if (marketOutcome.result == -1) {
                         await this.betVoided(bet.ID);
-                        this.logger.info(`on bookmaker bet voided successfully: Bet ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
+                        this.logger.info(`Bet voided: Bet ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
                     } else {
                         const settlementResult = marketOutcome.result == bet.SELECTION_ID ? SettlementResult.WON : SettlementResult.LOST;
                         await this.betSettlement(bet.BF_BET_ID, settlementResult);
-                        this.logger.info(`on bookmaker bet settled: Bet ID: ${bet.BF_BET_ID}, Result: ${settlementResult}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}`, SettlementService.name);
+                        this.logger.info(`Bet settled using market outcome: Bet ID: ${bet.BF_BET_ID}, Result: ${settlementResult}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}`, SettlementService.name);
                     }
+                    await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, marketOutcome);
+                    continue;
                 }
 
-                // Try fetching from SB
+                // Try fetching from SB if no cache and no market outcome found
                 const sbBookmakerMarket = await this.getBookmakerMarketFromSB(bet.EVENT_ID, bet.PROVIDER_ID);
                 if (sbBookmakerMarket) {
                     const runner = sbBookmakerMarket.runners.find(r => r.selectionId == bet.SELECTION_ID);
                     if (runner) {
                         await this.bookMakerBetSettlement(sbBookmakerMarket.marketId, sbBookmakerMarket.providerId, runner, sbBookmakerMarket.status, [bet]);
-                        this.logger.info(`Bet settled successfully: Market ID: ${sbBookmakerMarket.marketId}, Selection ID: ${bet.SELECTION_ID}, Result: ${sbBookmakerMarket.status}`, SettlementService.name);
+                        this.logger.info(`Bet settled from SB: Market ID: ${sbBookmakerMarket.marketId}, Selection ID: ${bet.SELECTION_ID}, Status: ${sbBookmakerMarket.status}`, SettlementService.name);
                     } else {
                         this.logger.error(`Runner not found in SB bookmaker market. ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
                     }
-                }
-
-                else {
+                } else {
                     this.logger.error(`Bookmaker market not found in cache, SB, or market outcomes. ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
                 }
             }
@@ -249,6 +255,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             this.logger.error(`Error checking bookmaker settlement: ${error.message}`, SettlementService.name);
         }
     }
+
 
 
 
