@@ -5,6 +5,7 @@ import { LoggerService } from 'src/common/logger.service';
 import { BookmakerFancyConfig, BookmakerFancyConfigUpdate } from 'src/model';
 import { BookmakerMarket } from 'src/model/bookmaker';
 import { FancyMarket } from 'src/model/fancy.market';
+import { WhiteLabelService } from './wl.service';
 
 
 @Injectable()
@@ -14,14 +15,15 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
   private maxBetSize = 20000;
 
   constructor(
-    private logger: LoggerService
+    private logger: LoggerService,
+    private witeLabelService: WhiteLabelService
   ) {
 
   }
 
   async onModuleInit() {
     await this.getbookmakerFancyConfig()
-     this.trackBMfacnyConfigChange()
+    this.trackBMfacnyConfigChange()
   }
 
   async onModuleDestroy() {
@@ -43,9 +45,14 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
           this.setMinMaxSize(payloadObject?.new_min_bet_size, payloadObject?.new_max_bet_size);
           this.logger.info(`bookmaker_fancy_config_update: ${JSON.stringify(payloadObject)}`, BmFancyConfigService.name);
         }
+        if (msg.channel === 'wl_changes')
+          this.witeLabelService.fetchActiveWhiteLabels().catch((err) =>
+            this.logger.error(`Failed to fetch active white labels: ${err.message}`, BmFancyConfigService.name)
+          );
 
       });
       await this.client.query('LISTEN bookmaker_fancy_config_update');
+      await this.client.query('LISTEN wl_changes');
 
     } catch (err) {
       this.logger.error(` subscribe placebet databse notification : can't connect  to database`, BmFancyConfigService.name);
@@ -84,7 +91,7 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
 
 
   upateMinMaxBetSizeFacyMarket(market: FancyMarket) {
-    if (market?.runners?.length==0) return market;
+    if (market?.runners?.length == 0) return market;
     const runners = market.runners.map(runner => (
       { ...runner, minBetSize: this.minBetSize, maxBetSize: this.maxBetSize }
     ))
