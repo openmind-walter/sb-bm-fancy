@@ -25,8 +25,10 @@ export class WhiteLabelService implements OnModuleInit {
     async fetchActiveWhiteLabels() {
         try {
             const response = await axios.get(`${this.configService.get('API_SERVER_URL')}/v1/api/white_label/active`);
-            if (response?.data?.result?.length)
+            if (response?.data?.result?.length) {
                 this.activeWhiteLabels = response?.data?.result as WhiteLabel[];
+                this.logger.info(`active White label updated:  ${JSON.stringify(this.activeWhiteLabels)}`, WhiteLabelService.name)
+            }
         } catch (error) {
             this.logger.error(`Error fetching active white labels: ${error.message}`, WhiteLabelService.name);
         }

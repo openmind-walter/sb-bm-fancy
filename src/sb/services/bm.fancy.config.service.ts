@@ -45,10 +45,12 @@ export class BmFancyConfigService implements OnModuleInit, OnModuleDestroy {
           this.setMinMaxSize(payloadObject?.new_min_bet_size, payloadObject?.new_max_bet_size);
           this.logger.info(`bookmaker_fancy_config_update: ${JSON.stringify(payloadObject)}`, BmFancyConfigService.name);
         }
-        if (msg.channel === 'wl_changes')
+        if (msg.channel === 'wl_changes') {
+          this.logger.info(" on DB white label update", BmFancyConfigService.name)
           this.witeLabelService.fetchActiveWhiteLabels().catch((err) =>
             this.logger.error(`Failed to fetch active white labels: ${err.message}`, BmFancyConfigService.name)
           );
+        }
 
       });
       await this.client.query('LISTEN bookmaker_fancy_config_update');
