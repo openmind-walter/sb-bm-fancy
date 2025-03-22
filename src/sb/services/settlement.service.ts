@@ -12,6 +12,7 @@ import { CachedKeys } from 'src/common/cachedKeys';
 import configuration from 'src/configuration';
 import { MarketOutCome, MarketOutComeType } from 'src/model/Marketoutcome';
 import { EventResult } from 'src/model/eventResult';
+import { WhiteLabelService } from './wl.service';
 
 enum SettlementResult {
     'WON' = "WON",
@@ -29,6 +30,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
         private configService: ConfigService,
         private logger: LoggerService,
         private readonly cacheService: CacheService,
+        private whiteLabelService: WhiteLabelService,
 
     ) { }
     async onModuleInit() {
@@ -217,6 +219,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                         if (runner && (runner?.status == BookmakerRunnerStaus?.LOSER || runner?.status == BookmakerRunnerStaus.WINNER
                             || runner?.status == BookmakerRunnerStaus?.REMOVED)) {
                             await this.bookMakerBetSettlement(bookMaker.marketId, bookMaker.providerId, runner, bookMaker.status, [bet]);
+                            continue;
                         }
                     }
                 }
@@ -224,13 +227,14 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                 // check market outcome by   SB get-latest-results 
                 const marketOutcome = marketOutcomes.find(m => m.event_id == Number(bet.EVENT_ID) && m.market_id?.toString() == bet.PROVIDER_ID);
                 if (marketOutcome) {
+                    if (bookMaker) await this.closeBookMarket(bookMaker);
                     if (marketOutcome.result == -1) {
                         await this.betVoided(bet.ID);
                         this.logger.info(`Bet voided: Bet ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
                     } else {
                         const settlementResult = marketOutcome.result == bet.SELECTION_ID ? SettlementResult.WON : SettlementResult.LOST;
                         await this.betSettlement(bet.BF_BET_ID, settlementResult);
-                        this.logger.info(`Bet settled using market outcome: Bet ID: ${bet.BF_BET_ID}, Result: ${settlementResult}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}`, SettlementService.name);
+                        this.logger.info(`Bet settled using market outcome: Bet ID: ${bet.BF_BET_ID}, Result: ${settlementResult}, Event: ${bet.EVENT_ID},provider ${bet?.PROVIDER_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}`, SettlementService.name);
                     }
                     await this.saveSettlementResult(bet.EVENT_ID, bet.MARKET_ID, bet.SELECTION_ID, bet.PROVIDER_ID, marketOutcome);
                     continue;
@@ -244,9 +248,11 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                         await this.bookMakerBetSettlement(sbBookmakerMarket.marketId, sbBookmakerMarket.providerId, runner, sbBookmakerMarket.status, [bet]);
                     } else {
                         this.logger.error(`Runner not found in SB bookmaker market. ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
+                        await this.betVoided(bet.ID);
                     }
                 } else {
                     this.logger.error(`Bookmaker market not found in ${!bookMaker ? 'cache,' : ''} SB, or market outcomes. ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
+                    await this.betVoided(bet.ID);
                 }
             }
         } catch (error) {
@@ -348,6 +354,46 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
             this.logger.error(`Error on getBookmakerMarketFromSB : ${error}`, SettlementService.name);
         }
     }
+
+
+    async closeBookMarket(bookMaker: BookmakerMarket) {
+        try {
+            const { redisPubClientFE } = configuration;
+            const updatedRunner: BookmakerRunner[] = bookMaker.runners.map(runner => ({
+                ...runner,
+                status: BookmakerRunnerStaus.CLOSED
+            }));
+
+            const updatedBookmaker: BookmakerMarket = {
+                ...bookMaker,
+                runners: updatedRunner,
+                status: BookmakerStaus.CLOSED
+            };
+            const wls = this.whiteLabelService.getActiveWhiteLabelsId();
+            if (!wls || wls.length === 0) return;
+
+            const promises = wls.map(async (wl) => {
+                const serviceId = `${wl}-${updatedBookmaker.serviceId}`;
+                const field = CachedKeys.getBookMakerHashField(updatedBookmaker.eventId, serviceId, updatedBookmaker.providerId);
+                const marketPubKey = CachedKeys.getBookMakerPub(updatedBookmaker.marketId, wl, updatedBookmaker.serviceId, updatedBookmaker.providerId);
+
+                try {
+                    await Promise.all([
+                        this.cacheService.hset(dragonflyClient, sbHashKey, field, JSON.stringify(updatedBookmaker)),
+                        this.cacheService.publish(redisPubClientFE, marketPubKey, JSON.stringify(updatedBookmaker))
+                    ]);
+                } catch (error) {
+                    this.logger.error(`Error while processing white label ${wl}: ${error}`, SettlementService.name);
+                }
+            });
+
+            await Promise.all(promises);
+
+        } catch (error) {
+            this.logger.error(`Error closing Bookmaker Market: ${error.message || error}`, SettlementService.name);
+        }
+    }
+
 
 }
 
