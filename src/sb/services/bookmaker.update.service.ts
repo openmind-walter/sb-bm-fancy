@@ -107,7 +107,7 @@ export class BookMakerUpdateService {
                 );
 
                 if (changedRunners.length > 0) {
-                    const settledRunners = newBookMaker.runners.filter(runner => runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER || runner.status == BookmakerRunnerStaus.REMOVED);
+                    const settledRunners = changedRunners?.filter(runner => runner.status == BookmakerRunnerStaus.LOSER || runner.status == BookmakerRunnerStaus.WINNER || runner.status == BookmakerRunnerStaus.REMOVED);
                     Promise.all(settledRunners.map(runner => this.settlementService.bookMakerBetSettlement(newBookMaker.marketId,
                         newBookMaker.providerId, runner, (newBookMaker.status)))).catch(err => this.logger.error("Settlement error:", err));
                 }
