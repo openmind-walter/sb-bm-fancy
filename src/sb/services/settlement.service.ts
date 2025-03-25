@@ -227,7 +227,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
                 // check market outcome by   SB get-latest-results 
                 const marketOutcome = marketOutcomes.find(m => m.event_id == Number(bet.EVENT_ID) && m.market_id?.toString() == bet.PROVIDER_ID);
                 if (marketOutcome) {
-                    if (bookMaker) await this.closeBookMarket(bookMaker);
+                    if (bookMaker) await this.closeBookmakerMarket(bookMaker);
                     if (marketOutcome.result == -1) {
                         await this.betVoided(bet.ID);
                         this.logger.info(`Bet voided: Bet ID: ${bet.ID}, Event: ${bet.EVENT_ID}, Selection: ${bet.SELECTION_ID}, Market: ${bet.MARKET_ID}, Provider: ${bet.PROVIDER_ID}`, SettlementService.name);
@@ -356,7 +356,7 @@ export class SettlementService implements OnModuleInit, OnModuleDestroy {
     }
 
 
-    async closeBookMarket(bookMaker: BookmakerMarket) {
+    async closeBookmakerMarket(bookMaker: BookmakerMarket) {
         try {
             const { redisPubClientFE } = configuration;
             const updatedRunner: BookmakerRunner[] = bookMaker.runners.map(runner => ({
